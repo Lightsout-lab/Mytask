@@ -29,14 +29,23 @@ jobs:
           mkdir -p public
           cp -f icon-192.png public/ 2>/dev/null || true
           cp -f icon-512.png public/ 2>/dev/null || true
-      - name: Fix iOS text replacements
+      - name: Fix iOS text replacements (robust)
         run: |
-          sed -i 's/\xe2\x80\x9c/"/g' src/App.jsx
-          sed -i 's/\xe2\x80\x9d/"/g' src/App.jsx
-          sed -i "s/\xe2\x80\x98/'/g" src/App.jsx
-          sed -i "s/\xe2\x80\x99/'/g" src/App.jsx
-          sed -i 's/\xe2\x80\xa6/.../g' src/App.jsx
-          sed -i '/```/d' src/App.jsx
+          python3 << 'PYEOF'
+          with open('src/App.jsx', 'r', encoding='utf-8') as f:
+              content = f.read()
+          replacements = {
+              '\u201c': '"', '\u201d': '"',
+              '\u2018': "'", '\u2019': "'",
+              '\u2026': '...',
+              '\u2013': '-', '\u2014': '-', '\u2015': '-',
+          }
+          for old, new in replacements.items():
+              content = content.replace(old, new)
+          content = '\n'.join([l for l in content.split('\n') if '```' not in l])
+          with open('src/App.jsx', 'w', encoding='utf-8') as f:
+              f.write(content)
+          PYEOF
       - run: npm install
       - run: npm run build
       - uses: actions/configure-pages@v4
