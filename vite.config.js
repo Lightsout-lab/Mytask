@@ -9,8 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'TASK QUEUE',
-        short_name: 'TASK Q',
+        name: 'Mytask',
+        short_name: 'Mytask',
         description: 'Priority-based task manager',
         theme_color: '#0a0a0a',
         background_color: '#0a0a0a',
