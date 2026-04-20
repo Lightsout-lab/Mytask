@@ -44,6 +44,10 @@ jobs:
               content = content.replace(old, new)
           content = '\n'.join([l for l in content.split('\n') if '```' not in l])
           content = content.replace('TASK QUEUE', 'MYTASK')
+          content = content.replace(
+              '<span style={{color:"#ff3b30"}}>▌</span>',
+              '<span style={{color:"#ff3b30",marginRight:-4}}>▌</span>'
+          )
           with open('src/App.jsx', 'w', encoding='utf-8') as f:
               f.write(content)
           PYEOF
