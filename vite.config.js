@@ -9,8 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Mytask',
-        short_name: 'Mytask',
+        name: 'MYTASK',
+        short_name: 'MYTASK',
         description: 'Priority-based task manager',
         theme_color: '#0a0a0a',
         background_color: '#0a0a0a',
