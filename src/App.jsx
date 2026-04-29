@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from “react”;
-const VER = “3.7.0”;
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from “react”;
+import { useSwipeable } from “react-swipeable”;
+
+const VER = “3.13.3”;
 const IMP = [{ v: 3, l: “高”, c: “#ff3b30”, icon: “≡” }, { v: 2, l: “中”, c: “#ff9500”, icon: “=” }, { v: 1, l: “低”, c: “#8e8e93”, icon: “―” }];
 const WI = [{ v: 3, l: “重い”, h: “4h+”, bw: 6, bh: 100 }, { v: 2, l: “普通”, h: “1-4h”, bw: 4, bh: 75 }, { v: 1, l: “軽い”, h: “~1h”, bw: 3, bh: 55 }, { v: 0, l: “超軽い”, h: “~10m”, bw: 2, bh: 40 }];
 const REC = [{ v: “none”, l: “なし” }, { v: “daily”, l: “毎日” }, { v: “weekly”, l: “毎週” }, { v: “monthly”, l: “毎月” }];
-const SORTS = [{ v: “smart”, l: “スマート順” }, { v: “heavy”, l: “重い順” }, { v: “light”, l: “軽い順” }, { v: “deadline”, l: “締切順” }, { v: “impGroup”, l: “重要度まとめ” }, { v: “weightGroup”, l: “重さまとめ” }, { v: “created”, l: “作成日順” }];
+const SORTS = [{ v: “smart”, l: “スマート順” }, { v: “importance”, l: “重要度”, rev: true }, { v: “heavy”, l: “重さ”, rev: true }, { v: “deadline”, l: “締切”, rev: true }, { v: “impGroup”, l: “重要度まとめ” }, { v: “weightGroup”, l: “重さまとめ” }];
 const ROI_MAP = {“3-3”:”#dc2626”,“3-2”:”#f97316”,“3-1”:”#facc15”,“3-0”:”#84cc16”,“2-3”:”#2563eb”,“2-2”:”#0891b2”,“2-1”:”#14b8a6”,“2-0”:”#5eead4”,“1-3”:”#9333ea”,“1-2”:”#c084fc”,“1-1”:”#67e8f9”,“1-0”:”#a7f3d0”};
+const ROI_MAP_CV = {“3-3”:”#000000”,“3-2”:”#1e3a8a”,“3-1”:”#1d4ed8”,“3-0”:”#3b82f6”,“2-3”:”#475569”,“2-2”:”#64748b”,“2-1”:”#94a3b8”,“2-0”:”#cbd5e1”,“1-3”:”#b45309”,“1-2”:”#d97706”,“1-1”:”#f59e0b”,“1-0”:”#fcd34d”};
 const TIER_MAP = {“3-1”:1,“3-0”:1,“3-2”:2,“3-3”:3,“2-1”:4,“2-0”:4,“2-2”:5,“2-3”:6,“1-1”:7,“1-0”:7,“1-2”:8,“1-3”:9};
 const TIER = {
 1:{bg:”#162016”,border:“rgba(34,197,94,0.35)”,shadow:“rgba(34,197,94,0.1)”,fs:16,fw:800,tc:”#fff”,mc:”#ccc”,pad:16,mfs:11,bfs:10,bp:“4px 10px”},
@@ -18,22 +21,24 @@ const TIER = {
 9:{bg:”#0a090c”,border:“rgba(168,85,247,0.1)”,shadow:“none”,fs:11,fw:500,tc:”#777”,mc:”#555”,pad:8,mfs:7.5,bfs:7,bp:“2px 5px”},
 };
 const TIER_LIGHT = {
-1:{bg:”#bbf7d0”,border:“rgba(22,163,74,0.6)”,shadow:“rgba(22,163,74,0.15)”,tc:”#14532d”,mc:”#166534”},
-2:{bg:”#fde68a”,border:“rgba(202,138,4,0.55)”,shadow:“rgba(202,138,4,0.12)”,tc:”#713f12”,mc:”#854d0e”},
-3:{bg:”#fed7aa”,border:“rgba(234,88,12,0.5)”,shadow:“rgba(234,88,12,0.1)”,tc:”#7c2d12”,mc:”#9a3412”},
-4:{bg:”#a5f3fc”,border:“rgba(14,165,233,0.5)”,shadow:“rgba(14,165,233,0.08)”,tc:”#164e63”,mc:”#155e75”},
-5:{bg:”#dbeafe”,border:“rgba(37,99,235,0.4)”,shadow:“rgba(37,99,235,0.06)”,tc:”#1e3a8a”,mc:”#1e40af”},
-6:{bg:”#ede9fe”,border:“rgba(124,58,237,0.35)”,shadow:“rgba(124,58,237,0.05)”,tc:”#4c1d95”,mc:”#5b21b6”},
-7:{bg:”#fdfcf8”,border:“rgba(161,161,170,0.4)”,shadow:“rgba(0,0,0,0.04)”,tc:”#3f3f46”,mc:”#52525b”},
-8:{bg:”#f5f3ec”,border:“rgba(168,85,247,0.3)”,shadow:“rgba(168,85,247,0.03)”,tc:”#581c87”,mc:”#6b21a8”},
-9:{bg:”#edeae0”,border:“rgba(168,85,247,0.25)”,shadow:“none”,tc:”#6b21a8”,mc:”#7e22ce”},
+1:{bg:”#bbf7d0”,border:“rgba(22,163,74,0.7)”,shadow:“rgba(22,163,74,0.18)”,tc:”#14532d”,mc:”#166534”},
+2:{bg:”#fde68a”,border:“rgba(202,138,4,0.65)”,shadow:“rgba(202,138,4,0.15)”,tc:”#713f12”,mc:”#854d0e”},
+3:{bg:”#fed7aa”,border:“rgba(234,88,12,0.6)”,shadow:“rgba(234,88,12,0.12)”,tc:”#7c2d12”,mc:”#9a3412”},
+4:{bg:”#bae6fd”,border:“rgba(14,165,233,0.55)”,shadow:“rgba(14,165,233,0.1)”,tc:”#164e63”,mc:”#155e75”},
+5:{bg:”#dbeafe”,border:“rgba(37,99,235,0.5)”,shadow:“rgba(37,99,235,0.08)”,tc:”#1e3a8a”,mc:”#1e40af”},
+6:{bg:”#ede9fe”,border:“rgba(124,58,237,0.45)”,shadow:“rgba(124,58,237,0.06)”,tc:”#4c1d95”,mc:”#5b21b6”},
+7:{bg:”#fafafa”,border:“rgba(82,82,82,0.5)”,shadow:“rgba(0,0,0,0.06)”,tc:”#404040”,mc:”#525252”},
+8:{bg:”#f0f0f0”,border:“rgba(82,82,82,0.4)”,shadow:“rgba(0,0,0,0.04)”,tc:”#525252”,mc:”#737373”},
+9:{bg:”#e5e5e5”,border:“rgba(82,82,82,0.35)”,shadow:“none”,tc:”#737373”,mc:”#737373”},
 };
 const TH = {
 dark:{bg:”#0a0a0a”,card:”#111”,text:”#fff”,sub:”#aaa”,mut:”#888”,dim:”#555”,brd:”#333”,inp:”#1a1a1a”,cOff:”#1a1a1a”,cOffT:”#888”,cOn:”#fff”,cOnT:”#000”,iBg:”#1a1a1a”,iBrd:”#333”,iC:”#ccc”,fBrd:”#444”,fOffT:”#999”,modal:“rgba(0,0,0,0.7)”,toast:”#1a1a1a”,memo:”#0a0a0a”,memB:”#2a2a2a”,shd:“rgba(0,0,0,0.4)”,chk:”#555”,addB:”#555”,addC:”#aaa”,sch:“dark”},
-light:{bg:”#e8e5dc”,card:”#fdfcf8”,text:”#18181b”,sub:”#3f3f46”,mut:”#52525b”,dim:”#a1a1aa”,brd:”#c4c0b3”,inp:”#f5f3ec”,cOff:”#f5f3ec”,cOffT:”#52525b”,cOn:”#18181b”,cOnT:”#fff”,iBg:”#fdfcf8”,iBrd:”#c4c0b3”,iC:”#3f3f46”,fBrd:”#b8b4a7”,fOffT:”#52525b”,modal:“rgba(24,24,27,0.5)”,toast:”#fdfcf8”,memo:”#f5f3ec”,memB:”#b8b4a7”,shd:“rgba(0,0,0,0.1)”,chk:”#a1a1aa”,addB:”#a1a1aa”,addC:”#52525b”,sch:“light”}
+light:{bg:”#e5e5e5”,card:”#ffffff”,text:”#0a0a0a”,sub:”#404040”,mut:”#525252”,dim:”#a3a3a3”,brd:”#737373”,inp:”#fafafa”,cOff:”#f5f5f5”,cOffT:”#404040”,cOn:”#0a0a0a”,cOnT:”#ffffff”,iBg:”#ffffff”,iBrd:”#525252”,iC:”#0a0a0a”,fBrd:”#525252”,fOffT:”#404040”,modal:“rgba(0,0,0,0.5)”,toast:”#ffffff”,memo:”#fafafa”,memB:”#a3a3a3”,shd:“rgba(0,0,0,0.15)”,chk:”#737373”,addB:”#525252”,addC:”#0a0a0a”,sch:“light”}
 };
 
-function roi(i,w){return ROI_MAP[i+”-”+(w>=3?3:w>=2?2:w>=1?1:0)]||”#555”}
+let COLOR_BLIND_MODE = false;
+
+function roi(i,w){const m=COLOR_BLIND_MODE?ROI_MAP_CV:ROI_MAP;return m[i+”-”+(w>=3?3:w>=2?2:w>=1?1:0)]||”#555”}
 function tierN(i,w){return TIER_MAP[i+”-”+(w>=3?3:w>=2?2:w>=1?1:0)]||5}
 function wDots(w,c){const n=w>=3?3:w>=2?2:w>=1?1:0;return w>=1?“●”.repeat(n):“○”}
 function score(t){if(t.done)return-999;if(t.type===“wish”)return-500;if(!t.deadline)return t.importance*15+t.weight*5+5;const h=(new Date(t.deadline).getTime()-Date.now())/36e5;if(h<0)return 1000+t.importance*10;const wh=t.weight===3?6:t.weight===2?3:t.weight===1?1:0.2;const br=h/Math.max(wh,0.1);let u;if(br<1)u=100;else if(br<2)u=80;else if(br<5)u=60;else if(br<24)u=30;else u=Math.max(5,20-br*0.1);return u*0.5+t.importance*15+t.weight*5}
@@ -41,21 +46,34 @@ function band(t){if(t.done)return 5;if(t.type===“wish”)return 6;const s=scor
 function sLabel(s){return s>=1000?{t:“OVERDUE”,c:”#ff3b30”}:s>=80?{t:“NOW”,c:”#ff3b30”}:s>=60?{t:“SOON”,c:”#ff9500”}:s>=40?{t:“NEXT”,c:”#ffcc00”}:{t:“LATER”,c:”#8e8e93”}}
 function fmtDl(d){if(!d)return”無期限”;const df=new Date(d)-new Date(),m=Math.round(df/6e4);if(m<0)return”overdue”;if(m<60)return m+“m”;const h=Math.floor(m/60),mm=m%60;if(h<24)return mm>0?h+“h “+mm+“m”:h+“h”;const dd=Math.floor(h/24),hh=h%24;if(dd<7)return hh>0?dd+“d “+hh+“h”:dd+“d”;const dl=new Date(d);return(dl.getMonth()+1)+”/”+dl.getDate()}
 function defDl(){const d=new Date();d.setDate(d.getDate()+1);d.setHours(18,0,0,0);return d.toISOString().slice(0,16)}
-function advRec(dl,r){if(!dl||r===“none”||!r)return dl;const d=new Date(dl);const now=new Date();let guard=0;do{if(r===“daily”)d.setDate(d.getDate()+1);else if(r===“weekly”)d.setDate(d.getDate()+7);else if(r===“monthly”)d.setMonth(d.getMonth()+1);else break;guard++}while(d<=now&&guard<400);return d.toISOString().slice(0,16)}
+
+function suggestEmoji(title){
+const t=title.toLowerCase();
+const map=[[“映画|cinema|映像”,“🎬”],[“音楽|曲|歌|music|ライブ|配信”,“🎵”],[“ギター|guitar”,“🎸”],[“ドラム|drum”,“🥁”],[“本|読書|読む|book”,“📚”],[“日記|diary”,“📓”],[“書く|writing|write”,“✍”],[“メール|mail|返信”,“✉”],[“電話|tel|call”,“📞”],[“買い物|shop|購入|amazon”,“🛒”],[“料理|cook|飯|ご飯”,“🍳”],[“食事|eat|ランチ|ディナー”,“🍽”],[“掃除|clean|片付け”,“🧹”],[“洗濯|laundry”,“🧺”],[“運動|exercise|筋トレ|トレーニング”,“🏋”],[“ランニング|走る|run”,“🏃”],[“散歩|walk”,“🚶”],[“ヨガ|yoga|瞑想”,“🧘”],[“風呂|お風呂|bath”,“🛁”],[“睡眠|寝|sleep”,“😴”],[“病院|medical|薬”,“💊”],[“会議|meeting|打ち合わせ”,“💼”],[“仕事|work”,“💼”],[“学習|勉強|study”,“📖”],[“コード|code|プログラ|coding”,“💻”],[“デザイン|design”,“🎨”],[“写真|photo|撮影”,“📷”],[“動画|video|撮る”,“🎥”],[“ゲーム|game|プレイ”,“🎮”],[“旅行|trip|travel”,“✈”],[“電車|train”,“🚃”],[“車|drive|ドライブ”,“🚗”],[“自転車|bike”,“🚴”],[“家|自宅|home”,“🏠”],[“スマホ|phone|iphone”,“📱”],[“pc|パソコン”,“💻”],[“tv|テレビ”,“📺”],[“アイデア|idea|思いつき”,“💡”],[“計画|plan|予定”,“📅”],[“タスク|task|todo”,“✅”],[“重要|important|急ぎ”,“🚨”],[“金|money|支払|銀行”,“💰”],[“プレゼント|gift|誕生日”,“🎁”],[“誕生日|birthday”,“🎂”],[“パーティ|party|祝”,“🎉”],[“ペット|犬|猫|pet”,“🐾”],[“植物|plant|garden”,“🌱”],[“天気|weather”,“☀”],[“雨|rain”,“☔”],[“服|fashion|整理”,“👕”],[“鍵|key”,“🔑”],[“本|hunter”,“📚”],[“ダーツ|darts”,“🎯”],[“プラモ|模型|model”,“🤖”]];
+for(const[pat,emoji]of map){if(new RegExp(pat).test(t))return emoji}
+return null;
+}
+
+function advRec(dl,r){if(!dl||r===“none”||!r)return dl;const d=new Date(dl);const now=new Date();let guard=0;do{if(r===“daily”)d.setDate(d.getDate()+1);else if(r===“weekly”)d.setDate(d.getDate()+7);else if(r===“monthly”)d.setMonth(d.getMonth()+1);else break;guard=guard+1}while(d<=now&&guard<400);return d.toISOString().slice(0,16)}
+
 function sortProm(task,so){
 if(so===“smart”)return tierN(task.importance,task.weight);
-if(so===“light”){const w=task.weight>=3?3:task.weight>=2?2:task.weight>=1?1:0;return[1,2,4,7][w]||5}
-if(so===“heavy”){const w=task.weight>=3?3:task.weight>=2?2:task.weight>=1?1:0;return[7,4,2,1][w]||5}
-if(so===“deadline”){if(!task.deadline)return 8;const h=(new Date(task.deadline).getTime()-Date.now())/36e5;if(h<0)return 1;if(h<6)return 2;if(h<24)return 3;if(h<72)return 5;return 7}
 if(so===“impGroup”||so===“weightGroup”)return tierN(task.importance,task.weight);
 return 5;
 }
 
-const SK=“task-queue-v1”,SOK=“task-queue-sort”,DK=“task-queue-defaults”,THK=“task-queue-theme”,TRK=“task-queue-trash”,HRK=“task-queue-habits”,DRK=“task-queue-dayreset”,LEK=“task-queue-locemojis”,LXK=“task-queue-lastexport”,TPK=“task-queue-todaypicks”,TDK=“task-queue-todaypickday”,BNK=“task-queue-bannercount”;
-const DD={importance:2,weight:2,hasDeadline:true,recurrence:“none”,location:””};
+const SK=“task-queue-v1”,SOK=“task-queue-sort”,SOR=“task-queue-sortrev”,DK=“task-queue-defaults”,THK=“task-queue-theme”,TRK=“task-queue-trash”,HRK=“task-queue-habits”,DRK=“task-queue-dayreset”,LEK=“task-queue-locemojis”,LXK=“task-queue-lastexport”,TPK=“task-queue-todaypicks”,TDK=“task-queue-todaypickday”,BNK=“task-queue-bannercount”,ABK=“task-queue-autobackup”,CBK=“task-queue-colorblind”,WRK=“task-queue-weekreport”,MRK=“task-queue-monthreset”,SNK=“task-queue-soundenabled”,SCK=“task-queue-soundcustom”,SCN=“task-queue-soundcustomname”;
+const DD={importance:2,weight:2,hasDeadline:false,recurrence:“none”,location:””};
+
 function ld(k,d){try{const r=localStorage.getItem(k);return r?JSON.parse(r):d}catch{return d}}
 let quotaWarnedFlag=false;
 function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){if(!quotaWarnedFlag&&(e.name===“QuotaExceededError”||e.code===22||e.code===1014)){quotaWarnedFlag=true;try{window.dispatchEvent(new CustomEvent(“tq-quota-exceeded”))}catch{}}}}
+
+function idbOpen(){return new Promise((res,rej)=>{const req=indexedDB.open(“task-queue-db”,1);req.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains(“audio”))db.createObjectStore(“audio”)};req.onsuccess=e=>res(e.target.result);req.onerror=()=>rej(req.error)})}
+async function idbSetAudio(key,blob){try{const db=await idbOpen();return new Promise((res,rej)=>{const tx=db.transaction(“audio”,“readwrite”);tx.objectStore(“audio”).put(blob,key);tx.oncomplete=()=>res(true);tx.onerror=()=>rej(tx.error)})}catch{return false}}
+async function idbGetAudio(key){try{const db=await idbOpen();return new Promise((res)=>{const tx=db.transaction(“audio”,“readonly”);const r=tx.objectStore(“audio”).get(key);r.onsuccess=()=>res(r.result||null);r.onerror=()=>res(null)})}catch{return null}}
+async function idbDelAudio(key){try{const db=await idbOpen();return new Promise((res)=>{const tx=db.transaction(“audio”,“readwrite”);tx.objectStore(“audio”).delete(key);tx.oncomplete=()=>res(true);tx.onerror=()=>res(false)})}catch{return false}}
+
 const Refresh=()=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:16,height:16}}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>);
 const Grip=()=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{width:14,height:14}}><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="18" x2="20" y2="18"/></svg>);
 
@@ -106,13 +124,87 @@ const[locEmojis,setLocEmojis]=useState(()=>ld(LEK,{}));
 const[mode,setMode]=useState(“task”);
 const[showForm,setShowForm]=useState(false);
 const[title,setTitle]=useState(””);const[importance,setImportance]=useState(2);const[weight,setWeight]=useState(2);
-const[deadline,setDeadline]=useState(defDl());const[hasDeadline,setHasDeadline]=useState(true);
+const[deadline,setDeadline]=useState(defDl());const[hasDeadline,setHasDeadline]=useState(false);
 const[memo,setMemo]=useState(””);const[location,setLocation]=useState(””);const[recurrence,setRecurrence]=useState(“none”);
+const[formSubs,setFormSubs]=useState([]);const[formSubInput,setFormSubInput]=useState(””);
+const[formExpandSubs,setFormExpandSubs]=useState(false);const[formExpandMemo,setFormExpandMemo]=useState(false);
 const[icon,setIcon]=useState(””);const[iconTouched,setIconTouched]=useState(false);
 const[filter,setFilter]=useState(“all”);const[locFilter,setLocFilter]=useState(null);
 const[editId,setEditId]=useState(null);const[expandedId,setExpandedId]=useState(null);
 const[memoExpId,setMemoExpId]=useState(null);
-const[sortOrder,setSortOrder]=useState(()=>localStorage.getItem(SOK)||“smart”);
+const[sortOrder,setSortOrder]=useState(()=>{const v=localStorage.getItem(SOK)||“smart”;if(v===“light”){localStorage.setItem(SOK,“heavy”);return “heavy”}if(v===“created”){localStorage.setItem(SOK,“smart”);return “smart”}return v});
+const[sortReverse,setSortReverse]=useState(()=>{const v=localStorage.getItem(SOK);if(v===“light”)return true;return ld(SOR,false)});
+const[soundEnabled,setSoundEnabled]=useState(()=>ld(SNK,false));
+const[customSoundName,setCustomSoundName]=useState(()=>ld(SCN,””));
+const audioCtxRef=useRef(null);
+const audioBufRef=useRef(null);
+const audioLoadPromiseRef=useRef(null);
+const ensureAudio=useCallback(async()=>{
+if(!soundEnabled)return null;
+if(!audioCtxRef.current){
+try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;audioCtxRef.current=new AC()}catch{return null}
+}
+const ctx=audioCtxRef.current;
+if(ctx.state===“suspended”){try{await ctx.resume()}catch{}}
+if(audioBufRef.current)return ctx;
+if(!audioLoadPromiseRef.current){
+audioLoadPromiseRef.current=(async()=>{
+try{
+const hasCustom=ld(SCK,false);
+let arr;
+if(hasCustom){
+const blob=await idbGetAudio(“complete”);
+if(blob)arr=await blob.arrayBuffer();
+}
+if(!arr){
+const res=await fetch(”./sounds/complete.mp3”);
+arr=await res.arrayBuffer();
+}
+audioBufRef.current=await ctx.decodeAudioData(arr);
+}catch{}
+})();
+}
+await audioLoadPromiseRef.current;
+return ctx;
+},[soundEnabled]);
+const playSoundOnBuf=()=>{
+const ctx=audioCtxRef.current;const buf=audioBufRef.current;
+if(!ctx||!buf)return;
+try{
+if(ctx.state===“suspended”)ctx.resume();
+const src=ctx.createBufferSource();
+src.buffer=buf;
+const gain=ctx.createGain();
+gain.gain.value=0.6;
+src.connect(gain);gain.connect(ctx.destination);
+src.start(0);
+}catch{}
+};
+const playCompleteSound=useCallback(()=>{
+if(!soundEnabled)return;
+if(audioBufRef.current){playSoundOnBuf();return}
+const t0=Date.now();
+ensureAudio().then(()=>{if(Date.now()-t0<1500)playSoundOnBuf()});
+},[soundEnabled,ensureAudio]);
+const reloadAudioBuf=useCallback(()=>{audioBufRef.current=null;audioLoadPromiseRef.current=null;if(soundEnabled)ensureAudio()},[soundEnabled,ensureAudio]);
+const setCustomSound=useCallback(async(file)=>{
+try{
+const blob=new Blob([await file.arrayBuffer()],{type:file.type||“audio/mpeg”});
+const ok=await idbSetAudio(“complete”,blob);
+if(!ok)return false;
+sv(SCK,true);sv(SCN,file.name);setCustomSoundName(file.name);
+reloadAudioBuf();
+return true;
+}catch{return false}
+},[reloadAudioBuf]);
+const resetCustomSound=useCallback(async()=>{
+await idbDelAudio(“complete”);
+sv(SCK,false);sv(SCN,””);setCustomSoundName(””);
+reloadAudioBuf();
+},[reloadAudioBuf]);
+useEffect(()=>{if(soundEnabled)ensureAudio()},[soundEnabled,ensureAudio]);
+useEffect(()=>{if(!soundEnabled)return;const init=()=>{if(audioCtxRef.current&&audioBufRef.current)return;ensureAudio().then(()=>{const ctx=audioCtxRef.current;const buf=audioBufRef.current;if(!ctx||!buf)return;try{const src=ctx.createBufferSource();src.buffer=buf;const gain=ctx.createGain();gain.gain.value=0;src.connect(gain);gain.connect(ctx.destination);src.start(0);src.stop(ctx.currentTime+0.001)}catch{}})};const opts={passive:true,once:true};window.addEventListener(“touchstart”,init,opts);window.addEventListener(“touchend”,init,opts);window.addEventListener(“click”,init,opts);return()=>{window.removeEventListener(“touchstart”,init,opts);window.removeEventListener(“touchend”,init,opts);window.removeEventListener(“click”,init,opts)}},[soundEnabled,ensureAudio]);
+const[sortDir,setSortDir]=useState(()=>localStorage.getItem(SOK+”-dir”)||“desc”);
 const[searchQ,setSearchQ]=useState(””);const[showSearch,setShowSearch]=useState(false);
 const[showSettings,setShowSettings]=useState(false);
 const[undoData,setUndoData]=useState(null);const[defaults,setDefaults]=useState(()=>ld(DK,DD));
@@ -135,9 +227,18 @@ const[showQuotaWarn,setShowQuotaWarn]=useState(false);
 const[tick,setTick]=useState(0);
 const[quickInput,setQuickInput]=useState(””);
 const[quickIcon,setQuickIcon]=useState(””);
+const[quickContinuous,setQuickContinuous]=useState(false);
+const[colorBlindMode,setColorBlindMode]=useState(()=>ld(CBK,false));
+const[focusTaskId,setFocusTaskId]=useState(null);
+const[showWeekReport,setShowWeekReport]=useState(false);
+const[showMonthReset,setShowMonthReset]=useState(false);
+
+useEffect(()=>{COLOR_BLIND_MODE=colorBlindMode;sv(CBK,colorBlindMode)},[colorBlindMode]);
+
 const ur=useRef(null);const fr=useRef(null);const formRef=useRef(null);
 const topSwipeStart=useRef(0);const dragStartY=useRef(0);const dragType=useRef(null);
 const sortDDRef=useRef(null);
+
 const T=isDark?TH.dark:TH.light;
 
 useEffect(()=>{const h=()=>setShowQuotaWarn(true);window.addEventListener(“tq-quota-exceeded”,h);return()=>window.removeEventListener(“tq-quota-exceeded”,h)},[]);
@@ -148,6 +249,7 @@ useEffect(()=>{sv(TRK,trash)},[trash]);
 useEffect(()=>{sv(LEK,locEmojis)},[locEmojis]);
 useEffect(()=>{sv(TPK,todayPicks)},[todayPicks]);
 useEffect(()=>{sv(BNK,bannerCount)},[bannerCount]);
+
 useEffect(()=>{
 const d=new Date();if(d.getHours()<dayReset)d.setDate(d.getDate()-1);
 const today=d.getFullYear()+”-”+String(d.getMonth()+1).padStart(2,“0”)+”-”+String(d.getDate()).padStart(2,“0”);
@@ -157,14 +259,30 @@ const activeCount=tasks.filter(t=>!t.done&&t.type!==“wish”).length;
 if(activeCount>=3)setTimeout(()=>setShowPicker(true),400)}
 // eslint-disable-next-line
 },[dayReset]);
+
 useEffect(()=>{
-const last=ld(LXK,0);
-if(last===0){sv(LXK,Date.now());return}
-const days=(Date.now()-last)/(24*36e5);
-if(tasks.length>=5&&days>=7)setTimeout(()=>setShowBackupNudge(true),800);
+const last=ld(ABK,0);
+const now=new Date();const todayKey=now.getFullYear()+String(now.getMonth()+1).padStart(2,“0”)+String(now.getDate()).padStart(2,“0”);
+const lastKey=ld(ABK+”-day”,””);
+if(last===0){sv(ABK,Date.now());sv(ABK+”-day”,todayKey);return}
+if(lastKey!==todayKey&&tasks.length>=3){
+setTimeout(()=>{
+try{
+const settings={sortOrder,defaults,dayReset,isDark,bannerCount};
+const payload={version:VER,exportedAt:new Date().toISOString(),autoBackup:true,tasks,habits,trash,locEmojis,settings,todayPicks};
+const b=new Blob([JSON.stringify(payload,null,2)],{type:“application/json”});
+const u=URL.createObjectURL(b);const a=document.createElement(“a”);a.href=u;a.download=“task-queue-backup.json”;a.click();URL.revokeObjectURL(u);
+sv(ABK,Date.now());sv(ABK+”-day”,todayKey);
+}catch{}
+},1500)
+}
 // eslint-disable-next-line
 },[]);
+
 useEffect(()=>{localStorage.setItem(SOK,sortOrder)},[sortOrder]);
+useEffect(()=>{sv(SOR,sortReverse)},[sortReverse]);
+useEffect(()=>{sv(SNK,soundEnabled)},[soundEnabled]);
+useEffect(()=>{localStorage.setItem(SOK+”-dir”,sortDir)},[sortDir]);
 useEffect(()=>{sv(DK,defaults)},[defaults]);
 useEffect(()=>{localStorage.setItem(THK,isDark?“dark”:“light”);document.body.style.background=T.bg},[isDark,T.bg]);
 useEffect(()=>{sv(DRK,dayReset)},[dayReset]);
@@ -173,24 +291,50 @@ useEffect(()=>{const now=Date.now();const cutoff=30*24*36e5;const old=tasks.filt
 // eslint-disable-next-line
 },[]);
 useEffect(()=>{const now=new Date();const lr=ld(“task-queue-lastreset”,0);const rt=new Date();rt.setHours(dayReset,0,0,0);if(now>rt&&lr<rt.getTime()){setHabits(p=>p.map(h=>({…h,doneToday:false})));sv(“task-queue-lastreset”,Date.now())}},[dayReset]);
+
+useEffect(()=>{
+const now=new Date();const day=now.getDay();const hr=now.getHours();
+const inWindow=(day===0&&hr>=19)||(day===1&&hr<dayReset);
+if(!inWindow)return;
+const lastSun=new Date(now);if(day===1)lastSun.setDate(lastSun.getDate()-1);
+const sunKey=lastSun.getFullYear()+”-”+String(lastSun.getMonth()+1).padStart(2,“0”)+”-”+String(lastSun.getDate()).padStart(2,“0”);
+if(ld(WRK,””)===sunKey)return;
+setShowWeekReport(true);sv(WRK,sunKey);
+},[tick,dayReset]);
+
+useEffect(()=>{
+const now=new Date();const adj=new Date(now);if(adj.getHours()<dayReset)adj.setDate(adj.getDate()-1);
+if(adj.getDate()!==1)return;
+const mKey=adj.getFullYear()+”-”+String(adj.getMonth()+1).padStart(2,“0”);
+if(ld(MRK,””)===mKey)return;
+const lm=new Date(adj);lm.setMonth(lm.getMonth()-1);
+const ls=new Date(lm.getFullYear(),lm.getMonth(),1);const le=new Date(lm.getFullYear(),lm.getMonth()+1,0,23,59,59,999);
+const stuck=tasks.filter(t=>{if(t.done||t.type===“wish”)return false;const cr=new Date(t.createdAt);const dl=t.deadline?new Date(t.deadline):null;return(dl&&dl>=ls&&dl<=le)||(cr>=ls&&cr<=le)});
+if(stuck.length>0)setShowMonthReset(true);
+sv(MRK,mKey);
+// eslint-disable-next-line
+},[tick,dayReset]);
+
 useEffect(()=>{if(showForm&&formRef.current)formRef.current.scrollIntoView({behavior:“smooth”,block:“center”})},[showForm]);
 useEffect(()=>{if(!showSortDD)return;const h=e=>{if(sortDDRef.current&&!sortDDRef.current.contains(e.target))setShowSortDD(false)};document.addEventListener(“mousedown”,h);document.addEventListener(“touchstart”,h);return()=>{document.removeEventListener(“mousedown”,h);document.removeEventListener(“touchstart”,h)}},[showSortDD]);
 
 const quickUpdate=useCallback((id,field,val)=>{setTasks(p=>p.map(t=>t.id===id?{…t,[field]:val}:t))},[]);
 const upSub=useCallback((id,s)=>setTasks(p=>p.map(t=>t.id===id?{…t,subtasks:s}:t)),[]);
 const upMemo=useCallback((id,m)=>setTasks(p=>p.map(t=>t.id===id?{…t,memo:m}:t)),[]);
+
 const locs=useMemo(()=>{const s=new Set();tasks.forEach(t=>{if(t.location)s.add(t.location)});return[…s]},[tasks]);
 
-const resetForm=useCallback(()=>{setTitle(””);setImportance(defaults.importance);setWeight(defaults.weight);setDeadline(defDl());setHasDeadline(defaults.hasDeadline);setMemo(””);setLocation(defaults.location);setRecurrence(defaults.recurrence);setIcon(””);setIconTouched(false);setShowForm(false);setEditId(null)},[defaults]);
+const resetForm=useCallback(()=>{setTitle(””);setImportance(defaults.importance);setWeight(defaults.weight);setDeadline(defDl());setHasDeadline(defaults.hasDeadline);setMemo(””);setLocation(defaults.location);setRecurrence(defaults.recurrence);setIcon(””);setIconTouched(false);setFormSubs([]);setFormSubInput(””);setFormExpandSubs(false);setFormExpandMemo(false);setShowForm(false);setEditId(null)},[defaults]);
 
 const submit=useCallback(()=>{
 if(!title.trim())return;
 const typ=mode===“wish”?“wish”:“task”;
 const finalIcon=icon.trim()||(locEmojis[location.trim()]||””);
-if(editId){setTasks(p=>p.map(t=>t.id===editId?{…t,title:title.trim(),importance,weight,deadline:hasDeadline?deadline:null,memo:memo.trim(),location:location.trim(),recurrence,icon:finalIcon}:t))}
-else{setTasks(p=>[…p,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),title:title.trim(),importance:typ===“wish”?1:importance,weight:typ===“wish”?1:weight,deadline:hasDeadline?deadline:null,memo:memo.trim(),location:location.trim(),recurrence:typ===“wish”?“none”:recurrence,icon:finalIcon,done:false,createdAt:Date.now(),type:typ}])}
+const cleanSubs=formSubs.filter(s=>s.title&&s.title.trim());
+if(editId){setTasks(p=>p.map(t=>t.id===editId?{…t,title:title.trim(),importance,weight,deadline:hasDeadline?deadline:null,memo:memo.trim(),location:location.trim(),recurrence,icon:finalIcon,subtasks:cleanSubs}:t))}
+else{setTasks(p=>[…p,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),title:title.trim(),importance:typ===“wish”?1:importance,weight:typ===“wish”?1:weight,deadline:hasDeadline?deadline:null,memo:memo.trim(),location:location.trim(),recurrence:typ===“wish”?“none”:recurrence,icon:finalIcon,done:false,createdAt:Date.now(),type:typ,subtasks:cleanSubs}])}
 resetForm()
-},[title,importance,weight,deadline,hasDeadline,memo,location,recurrence,icon,editId,resetForm,mode,locEmojis]);
+},[title,importance,weight,deadline,hasDeadline,memo,location,recurrence,icon,editId,resetForm,mode,locEmojis,formSubs]);
 
 const quickAdd=useCallback(()=>{
 if(!quickInput.trim())return;
@@ -201,7 +345,7 @@ setTasks(p=>[…p,{id:Date.now().toString(36)+Math.random().toString(36).slice(2
 setQuickInput(””);setQuickIcon(””)
 },[quickInput,quickIcon,mode,defaults,locEmojis]);
 
-const showUndo=useCallback((ts,a)=>{if(ur.current)clearTimeout(ur.current);setUndoData({tasks:ts,action:a});ur.current=setTimeout(()=>setUndoData(null),5000)},[]);
+const showUndo=useCallback((ts,a)=>{if(ur.current)clearTimeout(ur.current);setUndoData({tasks:ts,action:a});ur.current=setTimeout(()=>setUndoData(null),10000)},[]);
 
 const lastVibrateRef=useRef(0);
 const fireParticles=useCallback(imp=>{
@@ -219,17 +363,25 @@ const now=Date.now();
 if(typeof navigator!==“undefined”&&navigator.vibrate&&(now-lastVibrateRef.current)>300){lastVibrateRef.current=now;try{navigator.vibrate(imp===3?[12,25,22,25,40]:imp===2?[18,20,35]:28)}catch{}}
 setTimeout(()=>setParticles(p=>p.filter(x=>!x.id.startsWith(id+”-”))),2300);
 },[]);
-const togDone=useCallback(id=>{setTasks(prev=>{const t=prev.find(x=>x.id===id);if(!t)return prev;if(!t.done)fireParticles(t.importance||2);if(!t.done&&t.recurrence&&t.recurrence!==“none”&&t.deadline){const nt={…t,id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),deadline:advRec(t.deadline,t.recurrence),done:false,createdAt:Date.now(),completedAt:null};return prev.map(x=>x.id===id?{…x,done:true,completedAt:Date.now()}:x).concat(nt)}return prev.map(x=>x.id===id?{…x,done:!x.done,completedAt:!x.done?Date.now():null}:x)})},[fireParticles]);
+
+const togDone=useCallback((id,silentSound)=>{setTasks(prev=>{const t=prev.find(x=>x.id===id);if(!t)return prev;if(!t.done){fireParticles(t.importance||2);if(!silentSound)playCompleteSound()}if(!t.done&&t.recurrence&&t.recurrence!==“none”&&t.deadline){const nt={…t,id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),deadline:advRec(t.deadline,t.recurrence),done:false,createdAt:Date.now(),completedAt:null};return prev.map(x=>x.id===id?{…x,done:true,completedAt:Date.now()}:x).concat(nt)}return prev.map(x=>x.id===id?{…x,done:!x.done,completedAt:!x.done?Date.now():null}:x)})},[fireParticles,playCompleteSound]);
+const togHabitDone=useCallback((id,silentSound)=>{const tdy=new Date();if(tdy.getHours()<dayReset)tdy.setDate(tdy.getDate()-1);const key=tdy.getFullYear()+”-”+String(tdy.getMonth()+1).padStart(2,“0”)+”-”+String(tdy.getDate()).padStart(2,“0”);const y=new Date(tdy);y.setDate(y.getDate()-1);const yKey=y.getFullYear()+”-”+String(y.getMonth()+1).padStart(2,“0”)+”-”+String(y.getDate()).padStart(2,“0”);setHabits(p=>p.map(x=>{if(x.id!==id)return x;const now=!x.doneToday;if(now){const prev=x.streak||0;const newStreak=x.lastDoneDate===yKey?prev+1:x.lastDoneDate===key?prev:1;const isMilestone=[5,10,30,50,100].includes(newStreak);fireParticles(isMilestone?3:1);if(!silentSound)playCompleteSound();if(isMilestone)setTimeout(()=>fireParticles(3),200);return{…x,doneToday:true,lastDoneDate:key,streak:newStreak,bestStreak:Math.max(x.bestStreak||0,newStreak)}}return{…x,doneToday:false,lastDoneDate:x.lastDoneDate===key?yKey:x.lastDoneDate,streak:x.lastDoneDate===key?Math.max(0,(x.streak||1)-1):x.streak}}))},[dayReset,fireParticles,playCompleteSound]);
+
 const delTask=useCallback(id=>{const t=tasks.find(x=>x.id===id);if(!t)return;setTrash(p=>[…p,{…t,deletedAt:Date.now()}]);showUndo([t],“delete”);setTasks(p=>p.filter(x=>x.id!==id));if(expandedId===id)setExpandedId(null)},[tasks,expandedId,showUndo]);
+
 const restoreTask=useCallback(id=>{const t=trash.find(x=>x.id===id);if(!t)return;const{deletedAt,…task}=t;setTasks(p=>[…p,{…task,done:false,completedAt:null}]);setTrash(p=>p.filter(x=>x.id!==id))},[trash]);
+
 const undo=useCallback(()=>{if(!undoData)return;if(undoData.action===“delete”){setTasks(p=>[…p,…undoData.tasks]);setTrash(p=>p.filter(t=>!undoData.tasks.find(u=>u.id===t.id)))}setUndoData(null);if(ur.current)clearTimeout(ur.current)},[undoData]);
-const startEdit=useCallback(t=>{setTitle(t.title);setImportance(t.importance);setWeight(t.weight);setDeadline(t.deadline||defDl());setHasDeadline(!!t.deadline);setMemo(t.memo||””);setLocation(t.location||””);setRecurrence(t.recurrence||“none”);setIcon(t.icon||””);setIconTouched(!!t.icon);setEditId(t.id);setShowForm(true);setExpandedId(null)},[]);
+
+const startEdit=useCallback(t=>{setTitle(t.title);setImportance(t.importance);setWeight(t.weight);setDeadline(t.deadline||defDl());setHasDeadline(!!t.deadline);setMemo(t.memo||””);setLocation(t.location||””);setRecurrence(t.recurrence||“none”);setIcon(t.icon||””);setIconTouched(!!t.icon);setFormSubs(t.subtasks||[]);setFormSubInput(””);setFormExpandSubs((t.subtasks||[]).length>0);setFormExpandMemo(!!(t.memo&&t.memo.trim()));setEditId(t.id);setShowForm(true);setExpandedId(null)},[]);
+
 const doExport=useCallback(()=>{
 const settings={sortOrder,defaults,dayReset,isDark,bannerCount};
 const payload={version:VER,exportedAt:new Date().toISOString(),tasks,habits,trash,locEmojis,settings,todayPicks};
 const b=new Blob([JSON.stringify(payload,null,2)],{type:“application/json”});
 const u=URL.createObjectURL(b);const a=document.createElement(“a”);a.href=u;a.download=“task-queue-”+new Date().toISOString().slice(0,10)+”.json”;a.click();URL.revokeObjectURL(u);sv(LXK,Date.now())
 },[tasks,habits,trash,locEmojis,sortOrder,defaults,dayReset,isDark,bannerCount,todayPicks]);
+
 const doImportClick=useCallback(()=>fr.current?.click(),[]);
 const validateTask=t=>t&&typeof t.id===“string”&&typeof t.title===“string”&&t.title.trim();
 const doImport=useCallback(e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{
@@ -242,7 +394,7 @@ const impSettings=Array.isArray(imp)?null:(imp.settings&&typeof imp.settings===�
 const impPicks=Array.isArray(imp)?null:(Array.isArray(imp.todayPicks)?imp.todayPicks:null);
 if(impTasks.length===0&&!impHabits){alert(“有効なデータが見つかりません”);return}
 const hasFullBackup=!!(impHabits||impSettings||impLocE);
-const msg=hasFullBackup?“OK=完全上書き（すべて置換）\nキャンセル=追加マージ（重複ID除く）”:“OK=タスク上書き\nキャンセル=タスク追加”;
+const msg=hasFullBackup?“OK=完全上書き(すべて置換)\nキャンセル=追加マージ(重複ID除く)”:“OK=タスク上書き\nキャンセル=タスク追加”;
 if(confirm(msg)){
 setTasks(impTasks);
 if(impHabits)setHabits(impHabits);
@@ -265,7 +417,6 @@ alert(“マージ完了: タスク”+added.length+“件追加”)
 }
 }catch(err){alert(“インポート失敗: “+err.message)}};r.readAsText(f);e.target.value=””},[tasks,habits]);
 
-// Drag handlers
 const dragStart=useCallback((id,type,clientY)=>{setDraggingId(id);dragType.current=type;dragStartY.current=clientY},[]);
 const dragMove=useCallback(clientY=>{
 if(!draggingId)return;
@@ -302,31 +453,28 @@ else if(mode===“wish”)r=r.filter(t=>t.type===“wish”&&!t.done);
 else r=r.filter(t=>!t.done&&t.type!==“wish”);
 if(locFilter!==null)r=r.filter(t=>(t.location||””)===locFilter);
 if(searchQ.trim()){const q=searchQ.toLowerCase();r=r.filter(t=>t.title.toLowerCase().includes(q)||(t.memo||””).toLowerCase().includes(q)||(t.location||””).toLowerCase().includes(q))}
-// done filter: always sort by completedAt descending (most recent first)
 if(filter===“done”){r.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0))}
-// wish mode: keep array order (for drag reorder). Otherwise sort.
 else if(mode!==“wish”&&sortOrder!==“impGroup”&&sortOrder!==“weightGroup”){
 if(sortOrder===“smart”)r.sort((a,b)=>{if(a.bd!==b.bd)return a.bd-b.bd;if(a.weight!==b.weight)return a.weight-b.weight;return b.importance-a.importance});
-else if(sortOrder===“deadline”)r.sort((a,b)=>{if(!a.deadline&&!b.deadline)return 0;if(!a.deadline)return 1;if(!b.deadline)return-1;return new Date(a.deadline)-new Date(b.deadline)});
+else if(sortOrder===“importance”)r.sort((a,b)=>b.importance-a.importance);
 else if(sortOrder===“heavy”)r.sort((a,b)=>b.weight-a.weight);
-else if(sortOrder===“light”)r.sort((a,b)=>a.weight-b.weight);
-else if(sortOrder===“created”)r.sort((a,b)=>b.createdAt-a.createdAt);
+else if(sortOrder===“deadline”)r.sort((a,b)=>{if(!a.deadline&&!b.deadline)return 0;if(!a.deadline)return 1;if(!b.deadline)return-1;return new Date(a.deadline)-new Date(b.deadline)});
+if(sortReverse&&(sortOrder===“importance”||sortOrder===“heavy”||sortOrder===“deadline”))r.reverse();
 }
-// wish mode with deadline: emphasize near-deadline
-if(mode===“wish”&&sortOrder===“deadline”){r.sort((a,b)=>{if(!a.deadline&&!b.deadline)return 0;if(!a.deadline)return 1;if(!b.deadline)return-1;return new Date(a.deadline)-new Date(b.deadline)})}
-// TODAY picks pinned to top (task mode only, not in group mode, only if incomplete)
-if(mode===“task”&&todayPicks.length>0&&sortOrder!==“impGroup”&&sortOrder!==“weightGroup”){
+if(mode===“wish”&&sortOrder===“deadline”){r.sort((a,b)=>{if(!a.deadline&&!b.deadline)return 0;if(!a.deadline)return 1;if(!b.deadline)return-1;return new Date(a.deadline)-new Date(b.deadline)});if(sortReverse)r.reverse()}
+if(mode===“task”&&sortOrder===“smart”&&todayPicks.length>0){
 const picks=r.filter(t=>todayPicks.includes(t.id)&&!t.done);const rest=r.filter(t=>!(todayPicks.includes(t.id)&&!t.done));
 r=[…picks,…rest];
 }
 return r
-},[tasks,filter,locFilter,searchQ,sortOrder,mode,todayPicks,tick]);
+},[tasks,filter,locFilter,searchQ,sortOrder,sortReverse,mode,todayPicks,tick]);
 
 const topTasks=useMemo(()=>{
 const a=tasks.filter(t=>!t.done&&t.type!==“wish”).map(t=>({…t,sc:score(t),bd:band(t)}));
 a.sort((x,y)=>{if(x.bd!==y.bd)return x.bd-y.bd;if(x.weight!==y.weight)return x.weight-y.weight;return y.importance-x.importance});
 return a.slice(0,bannerCount)
 },[tasks,bannerCount,tick]);
+
 useEffect(()=>{if(topIdx>=topTasks.length&&topTasks.length>0)setTopIdx(0)},[topTasks.length,topIdx]);
 
 const groups=useMemo(()=>{
@@ -344,114 +492,184 @@ if(sortOrder===“weightGroup”)return[
 return null;
 },[sorted,sortOrder]);
 
-// Banner carousel
 const bannerTs=e=>{topSwipeStart.current=e.touches[0].clientX};
 const bannerTm=e=>{const dx=e.touches[0].clientX-topSwipeStart.current;setTopSwipeOff(dx)};
 const bannerTe=()=>{if(topSwipeOff>50&&topIdx>0)setTopIdx(topIdx-1);else if(topSwipeOff<-50&&topIdx<topTasks.length-1)setTopIdx(topIdx+1);setTopSwipeOff(0)};
 
-const gcss=”@import url(‘https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap’);*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}html,body,#root{min-height:100vh}input,select,button,textarea{font-family:‘Noto Sans JP’,sans-serif}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}@keyframes slideDown{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}@keyframes titleScroll{0%,12%{transform:translateX(0)}88%,100%{transform:translateX(var(–d))}}.task-card{animation:fadeIn .3s ease both}.overdue-pulse{animation:pulse 1.5s ease infinite}.form-slide{animation:slideUp .3s ease both}”;
+const gcss=”@import url(‘https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap’);*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}html,body,#root{min-height:100vh}input,select,button,textarea{font-family:‘Noto Sans JP’,sans-serif}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}@keyframes slideDown{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}@keyframes titleScroll{0%,12%{transform:translateX(0)}88%,100%{transform:translateX(var(–d))}}.task-card{animation:fadeIn .3s ease}.overdue-pulse{animation:pulse 1.5s ease infinite}.form-slide{animation:slideUp .3s ease}”;
 
 const isTask=mode===“task”,isWish=mode===“wish”,isHabit=mode===“habit”;
 const habitsSorted=useMemo(()=>{const done=habits.filter(h=>h.doneToday);const un=habits.filter(h=>!h.doneToday);return[…un,…done]},[habits]);
 const isGroupMode=(sortOrder===“impGroup”||sortOrder===“weightGroup”)&&isTask;
 const curTop=topTasks[topIdx];
 const wishList=useMemo(()=>tasks.filter(t=>t.type===“wish”&&!t.done),[tasks]);
+
 const stats=useMemo(()=>{
 const now=new Date();const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
 const weekStart=new Date(todayStart);weekStart.setDate(weekStart.getDate()-6);
 let todayDone=0,weekDone=0;
-tasks.forEach(t=>{if(!t.completedAt)return;const c=new Date(t.completedAt);if(c>=todayStart)todayDone++;if(c>=weekStart)weekDone++});
+tasks.forEach(t=>{if(!t.completedAt)return;const c=new Date(t.completedAt);if(c>=todayStart)todayDone=todayDone+1;if(c>=weekStart)weekDone=weekDone+1});
 return{todayDone,weekDone}
 },[tasks,tick]);
+
+const weekChart=useMemo(()=>{
+const now=new Date();now.setHours(0,0,0,0);
+const days=[];for(let i=6;i>=0;i=i-1){const d=new Date(now);d.setDate(d.getDate()-i);days.push({d:d,count:0,label:[“日”,“月”,“火”,“水”,“木”,“金”,“土”][d.getDay()]})}
+tasks.forEach(t=>{if(!t.completedAt)return;const c=new Date(t.completedAt);c.setHours(0,0,0,0);days.forEach(dy=>{if(c.getTime()===dy.d.getTime())dy.count=dy.count+1})});
+return days;
+},[tasks,tick]);
+
+const weekReportStats=useMemo(()=>{
+if(!showWeekReport)return null;
+const now=new Date();const lastSun=new Date(now);while(lastSun.getDay()!==0)lastSun.setDate(lastSun.getDate()-1);
+const ws=new Date(lastSun);ws.setDate(ws.getDate()-6);ws.setHours(0,0,0,0);
+const we=new Date(lastSun);we.setHours(23,59,59,999);
+let wd=0;const days=[];for(let i=0;i<7;i=i+1){const d=new Date(ws);d.setDate(d.getDate()+i);days.push({d:d,count:0,label:[“日”,“月”,“火”,“水”,“木”,“金”,“土”][d.getDay()]})}
+tasks.forEach(t=>{if(!t.completedAt)return;const c=new Date(t.completedAt);if(c>=ws&&c<=we){wd=wd+1;const ck=new Date(c);ck.setHours(0,0,0,0);days.forEach(dy=>{if(ck.getTime()===dy.d.getTime())dy.count=dy.count+1})}});
+const ns=new Date(now);ns.setHours(0,0,0,0);const ne=new Date(now);ne.setDate(ne.getDate()+7);
+let nN=0,nS=0;
+tasks.forEach(t=>{if(t.done||t.type===“wish”||!t.deadline)return;const dl=new Date(t.deadline);if(dl>=ns&&dl<=ne){const sc=score(t);if(sc>=80&&sc<1000)nN=nN+1;else if(sc>=60&&sc<80)nS=nS+1}});
+return{weekDone:wd,days,nextNow:nN,nextSoon:nS};
+},[showWeekReport,tasks]);
+
+const monthResetTasks=useMemo(()=>{
+if(!showMonthReset)return[];
+const now=new Date();const adj=new Date(now);if(adj.getHours()<dayReset)adj.setDate(adj.getDate()-1);
+const lm=new Date(adj);lm.setMonth(lm.getMonth()-1);
+const ls=new Date(lm.getFullYear(),lm.getMonth(),1);const le=new Date(lm.getFullYear(),lm.getMonth()+1,0,23,59,59,999);
+return tasks.filter(t=>{if(t.done||t.type===“wish”)return false;const cr=new Date(t.createdAt);const dl=t.deadline?new Date(t.deadline):null;return(dl&&dl>=ls&&dl<=le)||(cr>=ls&&cr<=le)});
+},[showMonthReset,tasks,dayReset]);
+
+useEffect(()=>{if(showMonthReset&&monthResetTasks.length===0)setShowMonthReset(false)},[showMonthReset,monthResetTasks.length]);
+
+const monthAction=useCallback((id,act)=>{
+if(act===“keep”){
+const now=new Date();const adj=new Date(now);if(adj.getHours()<dayReset)adj.setDate(adj.getDate()-1);
+const eom=new Date(adj.getFullYear(),adj.getMonth()+1,0,23,59,0,0);
+setTasks(p=>p.map(t=>t.id===id?{…t,deadline:eom.toISOString().slice(0,16)}:t));
+}else if(act===“next”){
+setTasks(p=>p.map(t=>{if(t.id!==id)return t;let base;if(t.deadline){base=new Date(t.deadline);base.setMonth(base.getMonth()+1)}else{const now=new Date();const adj=new Date(now);if(adj.getHours()<dayReset)adj.setDate(adj.getDate()-1);base=new Date(adj.getFullYear(),adj.getMonth()+2,0,23,59,0,0)}return{…t,deadline:base.toISOString().slice(0,16)}}));
+}else if(act===“trash”){
+const t=tasks.find(x=>x.id===id);if(!t)return;
+setTrash(p=>[…p,{…t,deletedAt:Date.now()}]);
+setTasks(p=>p.filter(x=>x.id!==id));
+}
+},[tasks,dayReset]);
+
+const latestDoneId=useMemo(()=>{const done=tasks.filter(t=>t.done&&t.completedAt);if(done.length===0)return null;done.sort((a,b)=>b.completedAt-a.completedAt);return done[0].id},[tasks]);
+
 const overdueCount=useMemo(()=>tasks.filter(t=>!t.done&&t.type!==“wish”&&t.deadline&&new Date(t.deadline)<new Date()).length,[tasks,tick]);
+
+const stallTask=useMemo(()=>{
+const now=Date.now();
+const real=tasks.filter(t=>!t.done&&t.type!==“wish”&&(now-t.createdAt)>30*24*36e5&&(!t.lastSeenStall||(now-t.lastSeenStall)>7*24*36e5));
+return real[0]||null;
+},[tasks,tick]);
+
+const stallSnooze=useCallback(id=>{setTasks(p=>p.map(t=>t.id===id?{…t,lastSeenStall:Date.now()}:t))},[]);
+const stallToToday=useCallback(id=>{setTodayPicks(p=>p.includes(id)?p:[…p,id]);stallSnooze(id)},[stallSnooze]);
+const stallGiveUp=useCallback(id=>{const t=tasks.find(x=>x.id===id);if(!t)return;setTrash(p=>[…p,{…t,deletedAt:Date.now()}]);setTasks(p=>p.filter(x=>x.id!==id))},[tasks]);
+
 const rescheduleOverdue=useCallback(()=>{
-if(!confirm(“期限切れのタスクを全て明日18:00に延期しますか？”))return;
+if(!confirm(“期限切れのタスクを全て明日18:00に延期しますか?”))return;
 const d=new Date();d.setDate(d.getDate()+1);d.setHours(18,0,0,0);const newDl=d.toISOString().slice(0,16);
 setTasks(p=>p.map(t=>(!t.done&&t.type!==“wish”&&t.deadline&&new Date(t.deadline)<new Date())?{…t,deadline:newDl}:t));
 },[]);
+
 const giveUpOverdue=useCallback(()=>{
-if(!confirm(“期限切れを全て諦めて削除しますか？（30日間ゴミ箱に保持）”))return;
+if(!confirm(“期限切れを全て諦めて削除しますか?(30日間ゴミ箱に保持)”))return;
 const now=Date.now();const overdue=tasks.filter(t=>!t.done&&t.type!==“wish”&&t.deadline&&new Date(t.deadline)<new Date());
 setTrash(p=>[…p,…overdue.map(t=>({…t,deletedAt:now}))]);
 setTasks(p=>p.filter(t=>!overdue.find(o=>o.id===t.id)));
 },[tasks]);
+
 const renameLocation=useCallback((oldName,newName)=>{
 const trimmed=(newName||””).trim();if(!trimmed||trimmed===oldName)return;
 const existing=new Set(tasks.map(t=>t.location).filter(Boolean));
-if(existing.has(trimmed)){if(!confirm(”「”+trimmed+”」は既に存在します。統合しますか？”))return}
+if(existing.has(trimmed)){if(!confirm(”「”+trimmed+”」は既に存在します。統合しますか?”))return}
 setTasks(p=>p.map(t=>t.location===oldName?{…t,location:trimmed}:t));
 setLocEmojis(p=>{const c={…p};if(c[oldName]&&!c[trimmed]){c[trimmed]=c[oldName]}delete c[oldName];return c});
 if(locFilter===oldName)setLocFilter(trimmed);
 },[locFilter,tasks]);
+
 const deleteLocation=useCallback(name=>{
-if(!confirm(“場所「”+name+”」を削除しますか？（タスクは残ります、場所情報のみクリア）”))return;
+if(!confirm(“場所「”+name+”」を削除しますか?(タスクは残ります、場所情報のみクリア)”))return;
 setTasks(p=>p.map(t=>t.location===name?{…t,location:””}:t));
 setLocEmojis(p=>{const c={…p};delete c[name];return c});
 if(locFilter===name)setLocFilter(null);
 },[locFilter]);
+
 const spinRoulette=useCallback(()=>{if(wishList.length===0){setRouletteId(null);return}let next;do{next=wishList[Math.floor(Math.random()*wishList.length)].id}while(wishList.length>1&&next===rouletteId);setRouletteId(next)},[wishList,rouletteId]);
 const rouletteTask=useMemo(()=>wishList.find(w=>w.id===rouletteId),[wishList,rouletteId]);
 useEffect(()=>{if(rouletteId&&!wishList.find(w=>w.id===rouletteId))setRouletteId(null)},[wishList,rouletteId]);
 
 return(<div style={{minHeight:“100dvh”,background:T.bg,color:T.text,fontFamily:”‘Noto Sans JP’,sans-serif”,padding:“calc(16px + env(safe-area-inset-top)) 14px calc(80px + env(safe-area-inset-bottom))”,maxWidth:600,margin:“0 auto”}}><style>{gcss+“html,body,#root{background:”+T.bg+”}”}</style>
 
-{/* Header */}
-
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-  <div><h1 style={{fontFamily:"'JetBrains Mono',monospace",fontSize:20,fontWeight:800,letterSpacing:2,color:T.text,margin:0}}><span style={{color:"#ff3b30"}}>▌</span>TASK QUEUE</h1>
-  <p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:T.mut,marginTop:3}}>{tasks.filter(t=>!t.done&&t.type!=="wish").length}件<span style={{opacity:.3,margin:"0 6px"}}>|</span><span style={{color:stats.todayDone>0?"#4ade80":T.mut}}>今日 ✓{stats.todayDone}</span><span style={{opacity:.3,margin:"0 6px"}}>|</span>週{stats.weekDone}<span style={{opacity:.3,margin:"0 6px"}}>|</span>{tasks.filter(t=>!t.done&&t.type==="wish").length}やりたい</p></div>
-  <div style={{display:"flex",gap:5}}>
-    <button style={{width:36,height:36,borderRadius:8,border:"1px solid "+T.iBrd,background:T.iBg,color:T.iC,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>window.location.reload()}><Refresh/></button>
-    <button style={{width:36,height:36,borderRadius:8,border:"1px solid "+T.iBrd,background:T.iBg,color:T.iC,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setIsDark(v=>!v)}>{isDark?"☀️":"🌙"}</button>
-    <button style={{width:36,height:36,borderRadius:8,border:"1px solid "+T.iBrd,background:T.iBg,color:T.iC,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setShowSettings(true)}>⚙</button>
-  </div>
+<div><h1 style={{fontFamily:"'JetBrains Mono',monospace",fontSize:20,fontWeight:800,letterSpacing:2,color:T.text,margin:0}}><span style={{color:"#ff3b30"}}>▌</span>TASK QUEUE</h1>
+<p style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:T.mut,marginTop:3}}>{tasks.filter(t=>!t.done&&t.type!=="wish").length}件<span style={{opacity:.3,margin:"0 6px"}}>|</span><span style={{color:stats.todayDone>0?"#4ade80":T.mut}}>今日 ✓{stats.todayDone}</span><span style={{opacity:.3,margin:"0 6px"}}>|</span>週{stats.weekDone}<span style={{opacity:.3,margin:"0 6px"}}>|</span>{tasks.filter(t=>!t.done&&t.type==="wish").length}やりたい</p></div>
+<div style={{display:"flex",gap:5}}>
+<button style={{width:36,height:36,borderRadius:8,border:"1px solid "+T.iBrd,background:T.iBg,color:T.iC,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>window.location.reload()}><Refresh/></button>
+<button style={{width:36,height:36,borderRadius:8,border:"1px solid "+T.iBrd,background:T.iBg,color:T.iC,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setIsDark(v=>!v)}>{isDark?"☀️":"🌙"}</button>
+<button style={{width:36,height:36,borderRadius:8,border:"1px solid "+T.iBrd,background:T.iBg,color:T.iC,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setShowSettings(true)}>⚙</button>
 </div>
-
-{/* Mode */}
+</div>
 
 <div style={{display:"flex",gap:4,marginBottom:8}}>
-  {[{k:"task",l:"タスク"},{k:"wish",l:"やりたい"},{k:"habit",l:"日課"}].map(m=>(<button key={m.k} style={{flex:1,padding:"9px 0",borderRadius:10,fontSize:13,fontWeight:700,textAlign:"center",letterSpacing:1,border:mode===m.k?"none":"1px solid "+T.brd,background:mode===m.k?T.cOn:"transparent",color:mode===m.k?T.cOnT:T.fOffT,cursor:"pointer"}} onClick={()=>{setMode(m.k);setFilter("all");setShowForm(false);setExpandedId(null);setMemoExpId(null)}}>{m.l}</button>))}
+{[{k:"task",l:"タスク"},{k:"wish",l:"やりたい"},{k:"habit",l:"日課"}].map(m=>(<button key={m.k} style={{flex:1,padding:"9px 0",borderRadius:10,fontSize:13,fontWeight:700,textAlign:"center",letterSpacing:1,border:mode===m.k?"none":"1px solid "+T.brd,background:mode===m.k?T.cOn:"transparent",color:mode===m.k?T.cOnT:T.fOffT,cursor:"pointer"}} onClick={()=>{setMode(m.k);setFilter("all");setShowForm(false);setExpandedId(null);setMemoExpId(null)}}>{m.l}</button>))}
 </div>
 
-{/* Quick capture (task/wish only, hidden when form open) */}
-{!isHabit&&!showForm&&<div style={{display:“flex”,gap:6,marginBottom:10}}>
-<input style={{width:40,padding:“8px 4px”,background:T.inp,border:“1px solid “+T.brd,borderRadius:8,color:T.text,fontSize:15,outline:“none”,textAlign:“center”,flexShrink:0}} placeholder=“📌” value={quickIcon} onChange={e=>setQuickIcon(e.target.value)} maxLength={2} aria-label=“アイコン”/>
-<input style={{flex:1,padding:“8px 10px”,background:T.inp,border:“1px solid “+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:“none”,minWidth:0}} placeholder={isWish?“やりたいことを素早く追加…”:“タスクを素早く追加…”} value={quickInput} onChange={e=>setQuickInput(e.target.value)} onKeyDown={e=>{if(e.key===“Enter”&&!e.nativeEvent.isComposing)quickAdd()}} aria-label=“クイック入力”/>
-<button style={{width:40,height:36,borderRadius:8,border:“1px solid “+T.brd,background:quickInput.trim()?T.cOn:T.cOff,color:quickInput.trim()?T.cOnT:T.cOffT,fontSize:18,fontWeight:700,cursor:“pointer”,flexShrink:0}} onClick={quickAdd} aria-label=“追加”>+</button>
+{!isHabit&&!showForm&&<div style={{marginBottom:10}}>
 
+<div style={{display:"flex",gap:6}}>
+<input style={{width:40,padding:"8px 4px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:15,outline:"none",textAlign:"center",flexShrink:0}} placeholder="📌" value={quickIcon} onChange={e=>setQuickIcon(e.target.value)} maxLength={2} aria-label="アイコン"/>
+<input id="quickInputEl" style={{flex:1,padding:"8px 10px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:"none",minWidth:0}} placeholder={isWish?"やりたいことを素早く追加...":"タスクを素早く追加..."} value={quickInput} onChange={e=>setQuickInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing){quickAdd();if(quickContinuous)setTimeout(()=>{const el=document.getElementById("quickInputEl");if(el)el.focus()},10)}}} aria-label="クイック入力"/>
+<button style={{width:40,height:36,borderRadius:8,border:"1px solid "+T.brd,background:quickInput.trim()?T.cOn:T.cOff,color:quickInput.trim()?T.cOnT:T.cOffT,fontSize:18,fontWeight:700,cursor:"pointer",flexShrink:0}} onClick={()=>{quickAdd();if(quickContinuous)setTimeout(()=>{const el=document.getElementById("quickInputEl");if(el)el.focus()},10)}} aria-label="追加">+</button>
+</div>
+<div style={{display:"flex",justifyContent:"flex-end",marginTop:4}}>
+<button style={{background:"none",border:"none",padding:"2px 6px",cursor:"pointer",fontSize:10,color:quickContinuous?"#4ade80":T.mut,fontFamily:"'JetBrains Mono',monospace"}} onClick={()=>setQuickContinuous(v=>!v)}>{quickContinuous?"✓ 連続追加ON":"連続追加OFF"}</button>
+</div>
 </div>}
 
-{/* Overdue banner */}
+{isTask&&stallTask&&!showForm&&<div style={{marginBottom:10,background:isDark?“rgba(168,85,247,0.1)”:“rgba(168,85,247,0.08)”,border:“1px solid rgba(168,85,247,0.4)”,borderRadius:12,padding:“10px 12px”}}>
+
+<div style={{fontSize:10,fontWeight:700,color:"#c084fc",marginBottom:4,fontFamily:"'JetBrains Mono',monospace",letterSpacing:1}}>👻 1ヶ月以上動いてないよ</div>
+<div style={{fontSize:13,fontWeight:700,color:T.text,marginBottom:8}}>{stallTask.icon?stallTask.icon+" ":""}{stallTask.title}</div>
+<div style={{display:"flex",gap:6}}>
+<button style={{flex:1,padding:"7px 8px",borderRadius:7,border:"1px solid #4ade80",background:"rgba(74,222,128,0.15)",color:"#4ade80",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>stallToToday(stallTask.id)}>今日やる</button>
+<button style={{flex:1,padding:"7px 8px",borderRadius:7,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>stallSnooze(stallTask.id)}>まだやる</button>
+<button style={{flex:1,padding:"7px 8px",borderRadius:7,border:"1px solid rgba(255,59,48,0.4)",background:"transparent",color:"#ff3b30",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>stallGiveUp(stallTask.id)}>やめる</button>
+</div>
+</div>}
+
 {isTask&&overdueCount>=3&&!showForm&&<div style={{marginBottom:10,background:“rgba(255,59,48,0.1)”,border:“1px solid rgba(255,59,48,0.4)”,borderRadius:12,padding:“10px 12px”}}>
 
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7,fontSize:11,fontWeight:700}}><span style={{color:"#ff3b30",fontFamily:"'JetBrains Mono',monospace"}}>⚠ 期限切れ {overdueCount}件</span></div>
-  <div style={{display:"flex",gap:6}}>
-    <button style={{flex:1,padding:"7px 10px",borderRadius:7,border:"1px solid rgba(255,149,0,0.5)",background:"rgba(255,149,0,0.12)",color:"#ff9500",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={rescheduleOverdue}>明日に延期</button>
-    <button style={{flex:1,padding:"7px 10px",borderRadius:7,border:"1px solid rgba(255,59,48,0.5)",background:"rgba(255,59,48,0.12)",color:"#ff3b30",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={giveUpOverdue}>諦めて削除</button>
-  </div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7,fontSize:11,fontWeight:700}}><span style={{color:"#ff3b30",fontFamily:"'JetBrains Mono',monospace"}}>⚠ 期限切れ {overdueCount}件</span></div>
+<div style={{display:"flex",gap:6}}>
+<button style={{flex:1,padding:"7px 10px",borderRadius:7,border:"1px solid rgba(255,149,0,0.5)",background:"rgba(255,149,0,0.12)",color:"#ff9500",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={rescheduleOverdue}>明日に延期</button>
+<button style={{flex:1,padding:"7px 10px",borderRadius:7,border:"1px solid rgba(255,59,48,0.5)",background:"rgba(255,59,48,0.12)",color:"#ff3b30",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={giveUpOverdue}>諦めて削除</button>
+</div>
 </div>}
 
-{/* Top banner - swipeable carousel */}
 {isTask&&curTop&&!showForm&&!searchQ&&locFilter===null&&(<div style={{marginBottom:12}}>
 
 <div style={{background:T.card,border:"1px solid "+sLabel(score(curTop)).c,borderRadius:14,padding:"14px 16px",transform:"translateX("+topSwipeOff+"px)",transition:topSwipeOff===0?"transform .25s":"none",touchAction:"pan-y"}} onTouchStart={bannerTs} onTouchMove={bannerTm} onTouchEnd={bannerTe}>
-  <div style={{fontSize:10,fontWeight:700,marginBottom:5,letterSpacing:1,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-    <span style={{color:sLabel(score(curTop)).c,fontFamily:"JetBrains Mono"}}>● 今やるべきタスク</span>
-    <span style={{color:T.dim,fontSize:9,fontFamily:"JetBrains Mono"}}>{topIdx+1}/{topTasks.length}</span>
-  </div>
-  <div style={{fontSize:16,fontWeight:700,color:T.text,marginBottom:5}}>{curTop.icon?curTop.icon+" ":""}{curTop.title}</div>
-  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:T.sub,display:"flex",gap:8}}><span>{fmtDl(curTop.deadline)}</span><span style={{opacity:.3}}>|</span><span>スコア {Math.round(score(curTop))}</span></div>
+<div style={{fontSize:10,fontWeight:700,marginBottom:5,letterSpacing:1,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+<span style={{color:sLabel(score(curTop)).c,fontFamily:"JetBrains Mono"}}>● 今やるべきタスク</span>
+<span style={{color:T.dim,fontSize:9,fontFamily:"JetBrains Mono"}}>{topIdx+1}/{topTasks.length}</span>
+</div>
+<div style={{fontSize:16,fontWeight:700,color:T.text,marginBottom:5}}>{curTop.icon?curTop.icon+" ":""}{curTop.title}</div>
+<div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:T.sub,display:"flex",gap:8,alignItems:"center"}}><span>{fmtDl(curTop.deadline)}</span><span style={{opacity:.3}}>|</span><span>スコア {Math.round(score(curTop))}</span><span style={{flex:1}}/><button style={{background:sLabel(score(curTop)).c,border:"none",borderRadius:6,color:"#000",padding:"4px 10px",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",letterSpacing:1}} onClick={()=>setFocusTaskId(curTop.id)}>▶ これやる</button></div>
 </div>
 {topTasks.length>1&&topTasks.length<=5&&<div style={{display:"flex",justifyContent:"center",gap:6,marginTop:6}}>{topTasks.map((_,i)=><span key={i} onClick={()=>setTopIdx(i)} style={{width:6,height:6,borderRadius:"50%",background:i===topIdx?sLabel(score(curTop)).c:T.dim,cursor:"pointer",transition:"background .2s"}}/>)}</div>}
 </div>)}
 
-{/* Wish roulette banner (C1) */}
 {isWish&&wishList.length>0&&!showForm&&(<div style={{marginBottom:12}}>
 {!rouletteTask?<button style={{width:“100%”,padding:“14px 16px”,background:T.card,border:“1px dashed “+T.brd,borderRadius:14,color:T.text,fontSize:14,fontWeight:700,cursor:“pointer”,display:“flex”,alignItems:“center”,justifyContent:“center”,gap:8,letterSpacing:1}} onClick={spinRoulette}>🎲 何やるルーレット</button>
 :<div style={{background:T.card,border:“1px solid #c084fc”,borderRadius:14,padding:“14px 16px”}}>
 
 <div style={{fontSize:10,fontWeight:700,marginBottom:5,letterSpacing:1,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-<span style={{color:"#c084fc",fontFamily:"JetBrains Mono"}}>🎲 これやる？</span>
+<span style={{color:"#c084fc",fontFamily:"JetBrains Mono"}}>🎲 これやる?</span>
 <button style={{background:"none",border:"1px solid "+T.brd,borderRadius:6,color:T.sub,fontSize:14,cursor:"pointer",padding:"2px 8px"}} onClick={spinRoulette}>🎲</button>
 </div>
 <div style={{fontSize:16,fontWeight:700,color:T.text,marginBottom:5}}>{rouletteTask.icon?rouletteTask.icon+" ":"⭐ "}{rouletteTask.title}</div>
@@ -459,81 +677,77 @@ return(<div style={{minHeight:“100dvh”,background:T.bg,color:T.text,fontFami
 </div>}
 </div>)}
 
-{/* Filter + Sort */}
 {!isHabit&&<>
 
-  <div style={{display:"flex",gap:4,marginBottom:6}}>
-    {(isTask?[{k:"all",l:"すべて"},{k:"noDeadline",l:"無期限"},{k:"active",l:"アクティブ"},{k:"done",l:"完了"}]:[{k:"all",l:"すべて"},{k:"done",l:"完了"}]).map(f=>(<button key={f.k} style={{padding:"8px 14px",borderRadius:8,border:"1px solid "+T.fBrd,fontSize:13,fontWeight:600,whiteSpace:"nowrap",background:filter===f.k&&locFilter===null?T.cOn:"transparent",color:filter===f.k&&locFilter===null?T.cOnT:T.fOffT,cursor:"pointer"}} onClick={()=>{setFilter(f.k);setLocFilter(null)}}>{f.l}</button>))}
-  </div>
-  <div style={{display:"flex",gap:6,marginBottom:6,alignItems:"center",position:"relative"}}>
-    <button style={{display:"flex",alignItems:"center",justifyContent:"center",width:34,height:30,borderRadius:8,border:"1px solid "+T.fBrd,background:showSearch?T.cOn:T.inp,color:showSearch?T.cOnT:T.mut,fontSize:14,cursor:"pointer",flexShrink:0}} onClick={()=>setShowSearch(v=>!v)}>🔍</button>
-    <div ref={sortDDRef} style={{position:"relative"}}>
-      <button style={{display:"flex",alignItems:"center",gap:3,padding:"6px 10px",borderRadius:8,border:"1px solid "+T.fBrd,background:T.inp,fontSize:11,fontWeight:600,color:T.sub,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer"}} onClick={()=>setShowSortDD(v=>!v)}>▼ {SORTS.find(s=>s.v===sortOrder)?.l}</button>
-      {showSortDD&&<div style={{position:"absolute",top:34,left:0,background:T.card,border:"1px solid "+T.brd,borderRadius:10,padding:6,zIndex:50,boxShadow:"0 4px 12px "+T.shd,minWidth:140}}>{SORTS.map(s=><button key={s.v} style={{display:"block",width:"100%",textAlign:"left",padding:"8px 12px",borderRadius:6,border:"none",background:sortOrder===s.v?T.cOn:"transparent",color:sortOrder===s.v?T.cOnT:T.sub,fontSize:12,fontWeight:600,cursor:"pointer",marginBottom:2}} onClick={()=>{setSortOrder(s.v);setShowSortDD(false);setOpenGroup(null)}}>{s.l}</button>)}</div>}
-    </div>
-  </div>
-  {locs.length>0&&isTask&&<div style={{display:"flex",gap:6,marginBottom:10,alignItems:"center",flexWrap:"wrap"}}>
-    <span style={{fontSize:12,color:T.mut}}>📍</span>{locs.map(l=><button key={l} style={{padding:"3px 10px",borderRadius:14,fontSize:10,fontWeight:600,color:locFilter===l?T.cOnT:T.mut,background:locFilter===l?T.cOn:T.inp,border:"1px solid "+T.brd,cursor:"pointer",display:"flex",alignItems:"center",gap:3}} onClick={()=>setLocFilter(locFilter===l?null:l)}>{locEmojis[l]&&<span>{locEmojis[l]}</span>}{l}</button>)}
-  </div>}
-  {showSearch&&<input className="form-slide" style={{width:"100%",padding:"10px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:9,color:T.text,fontSize:14,outline:"none",marginBottom:8}} placeholder="検索..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} autoFocus/>}
+<div style={{display:"flex",gap:4,marginBottom:6}}>
+{(isTask?[{k:"all",l:"すべて"},{k:"noDeadline",l:"無期限"},{k:"active",l:"アクティブ"},{k:"done",l:"完了"}]:[{k:"all",l:"すべて"},{k:"done",l:"完了"}]).map(f=>(<button key={f.k} style={{padding:"8px 14px",borderRadius:8,border:"1px solid "+T.fBrd,fontSize:13,fontWeight:600,whiteSpace:"nowrap",background:filter===f.k&&locFilter===null?T.cOn:"transparent",color:filter===f.k&&locFilter===null?T.cOnT:T.fOffT,cursor:"pointer"}} onClick={()=>{setFilter(f.k);setLocFilter(null)}}>{f.l}</button>))}
+</div>
+<div style={{display:"flex",gap:6,marginBottom:6,alignItems:"center",position:"relative"}}>
+<button style={{display:"flex",alignItems:"center",justifyContent:"center",width:34,height:30,borderRadius:8,border:"1px solid "+T.fBrd,background:showSearch?T.cOn:T.inp,color:showSearch?T.cOnT:T.mut,fontSize:14,cursor:"pointer",flexShrink:0}} onClick={()=>setShowSearch(v=>!v)}>🔍</button>
+<div ref={sortDDRef} style={{position:"relative"}}>
+<button style={{display:"flex",alignItems:"center",gap:3,padding:"6px 10px",borderRadius:8,border:"1px solid "+T.fBrd,background:T.inp,fontSize:11,fontWeight:600,color:T.sub,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer"}} onClick={()=>setShowSortDD(v=>!v)}>{(SORTS.find(s=>s.v===sortOrder)?.rev)?(sortReverse?"▲ ":"▼ "):"▼ "}{SORTS.find(s=>s.v===sortOrder)?.l}</button>
+{showSortDD&&<div style={{position:"absolute",top:34,left:0,background:T.card,border:"1px solid "+T.brd,borderRadius:10,padding:6,zIndex:50,boxShadow:"0 4px 12px "+T.shd,minWidth:140}}>{SORTS.map(s=><button key={s.v} style={{display:"block",width:"100%",textAlign:"left",padding:"8px 12px",borderRadius:6,border:"none",background:sortOrder===s.v?T.cOn:"transparent",color:sortOrder===s.v?T.cOnT:T.sub,fontSize:12,fontWeight:600,cursor:"pointer",marginBottom:2}} onClick={()=>{if(sortOrder===s.v&&s.rev){setSortReverse(v=>!v)}else{setSortOrder(s.v);setSortReverse(false)}setShowSortDD(false);setOpenGroup(null)}}>{(sortOrder===s.v&&s.rev)?(sortReverse?"▲ ":"▼ "):""}{s.l}</button>)}</div>}
+</div>
+</div>
+{locs.length>0&&isTask&&<div style={{display:"flex",gap:6,marginBottom:10,alignItems:"center",flexWrap:"wrap"}}>
+<span style={{fontSize:12,color:T.mut}}>📍</span>{locs.map(l=><button key={l} style={{padding:"3px 10px",borderRadius:14,fontSize:10,fontWeight:600,color:locFilter===l?T.cOnT:T.mut,background:locFilter===l?T.cOn:T.inp,border:"1px solid "+T.brd,cursor:"pointer",display:"flex",alignItems:"center",gap:3}} onClick={()=>setLocFilter(locFilter===l?null:l)}>{locEmojis[l]&&<span>{locEmojis[l]}</span>}{l}</button>)}
+</div>}
+{showSearch&&<input className="form-slide" style={{width:"100%",padding:"10px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:9,color:T.text,fontSize:14,outline:"none",marginBottom:8}} placeholder="検索..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} autoFocus/>}
 </>}
 
-{/* Add button */}
-{!showForm&&!isHabit&&<button style={{width:“100%”,padding:13,border:“1.5px dashed “+T.addB,borderRadius:10,color:T.addC,fontSize:13,fontWeight:700,cursor:“pointer”,marginBottom:10,display:“flex”,alignItems:“center”,justifyContent:“center”,gap:6,letterSpacing:1,fontFamily:”‘JetBrains Mono’,monospace”,background:“transparent”}} onClick={()=>{resetForm();setShowForm(true)}}>+ {isWish?“やりたいことを追加”:“新しいタスク”}</button>}
+{!showForm&&!isHabit&&null}
 
-{/* Form */}
 {showForm&&<div ref={formRef} className=“form-slide” style={{background:T.card,border:“1px solid “+T.brd,borderRadius:14,padding:16,marginBottom:12,maxWidth:“100%”,overflow:“hidden”}}>
 
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span style={{fontSize:14,fontWeight:700,color:T.text}}>{editId?"編集":isWish?"やりたいこと":"新しいタスク"}</span><button style={{background:"none",border:"none",color:T.mut,fontSize:16,cursor:"pointer"}} onClick={resetForm}>✕</button></div>
-  <div style={{display:"flex",gap:6,marginBottom:6}}><input style={{width:44,padding:"9px 6px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:16,outline:"none",textAlign:"center",flexShrink:0}} placeholder="📌" value={icon} onChange={e=>{setIcon(e.target.value);setIconTouched(true)}} maxLength={2}/><input style={{flex:1,padding:"9px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:14,outline:"none",minWidth:0}} placeholder={isWish?"やりたいこと...":"タスク名..."} value={title} onChange={e=>setTitle(e.target.value)} autoFocus onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&submit()}/></div>
-  {!isWish&&<>
-    <div style={{marginBottom:10}}><div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>重要度</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{IMP.map(o=><button key={o.v} style={{padding:"6px 12px",borderRadius:7,border:"1px solid "+(importance===o.v?o.c:T.brd),fontSize:12,fontWeight:600,cursor:"pointer",background:importance===o.v?o.c:T.cOff,color:importance===o.v?"#fff":T.cOffT,display:"flex",alignItems:"center",gap:4}} onClick={()=>setImportance(o.v)}><span style={{fontSize:13,fontWeight:900}}>{o.icon}</span>{o.l}</button>)}</div></div>
-    <div style={{marginBottom:10}}><div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>重さ</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{WI.map(o=>{const c=roi(importance,o.v);return<button key={o.v} style={{padding:"6px 10px",borderRadius:7,border:"1px solid "+(weight===o.v?c:T.brd),fontSize:11,fontWeight:weight===o.v?700:600,cursor:"pointer",background:weight===o.v?c:T.cOff,color:weight===o.v?"#000":T.cOffT}} onClick={()=>setWeight(o.v)}>{o.l}</button>})}</div></div>
-  </>}
-  <div style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,fontFamily:"'JetBrains Mono',monospace"}}>締切</span><button style={{padding:"3px 10px",borderRadius:7,border:"1px solid "+(hasDeadline?T.brd:T.cOn),fontSize:10,fontWeight:600,cursor:"pointer",background:hasDeadline?T.cOff:T.cOn,color:hasDeadline?T.cOffT:T.cOnT}} onClick={()=>setHasDeadline(v=>!v)}>{hasDeadline?"無期限にする":"無期限"}</button></div>{hasDeadline&&<input type="datetime-local" style={{width:"100%",padding:"9px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:"none",colorScheme:T.sch}} value={deadline} onChange={e=>setDeadline(e.target.value)}/>}</div>
-  {!isWish&&hasDeadline&&<div style={{marginBottom:10}}><div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>繰り返し</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{REC.map(o=><button key={o.v} style={{padding:"6px 12px",borderRadius:7,border:"1px solid "+(recurrence===o.v?T.cOn:T.brd),fontSize:11,fontWeight:600,cursor:"pointer",background:recurrence===o.v?T.cOn:T.cOff,color:recurrence===o.v?T.cOnT:T.cOffT}} onClick={()=>setRecurrence(o.v)}>{o.l}</button>)}</div></div>}
-  {!isWish&&<div style={{marginBottom:10}}><div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>場所</div><input style={{width:"100%",padding:"9px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:"none",minWidth:0}} placeholder="例: 自宅" value={location} onChange={e=>{const v=e.target.value;setLocation(v);if(!iconTouched&&locEmojis[v.trim()])setIcon(locEmojis[v.trim()])}} list="pl"/><datalist id="pl">{locs.map(l=><option key={l} value={l}/>)}</datalist>{location.trim()&&locEmojis[location.trim()]&&!iconTouched&&<div style={{fontSize:10,color:T.mut,marginTop:4,fontFamily:"'JetBrains Mono',monospace"}}>→ アイコン自動設定: {locEmojis[location.trim()]}</div>}</div>}
-  <div style={{marginBottom:10}}><div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>メモ</div><textarea style={{width:"100%",padding:"9px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:"none",minHeight:50,resize:"vertical",fontFamily:"inherit"}} placeholder="メモ..." value={memo} onChange={e=>setMemo(e.target.value)}/></div>
-  <button style={{width:"100%",padding:12,background:"#ff3b30",border:"none",borderRadius:9,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={submit}>{editId?"更新する":"追加する"}</button>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span style={{fontSize:14,fontWeight:700,color:T.text}}>{editId?"編集":isWish?"やりたいこと":"新しいタスク"}</span><button style={{background:"none",border:"none",color:T.mut,fontSize:16,cursor:"pointer"}} onClick={resetForm}>✕</button></div>
+<div style={{display:"flex",gap:6,marginBottom:6}}><input style={{width:44,padding:"9px 6px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:16,outline:"none",textAlign:"center",flexShrink:0}} placeholder="📌" value={icon} onChange={e=>{setIcon(e.target.value);setIconTouched(true)}} maxLength={2}/><input style={{flex:1,padding:"9px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:14,outline:"none",minWidth:0}} placeholder={isWish?"やりたいこと...":"タスク名..."} value={title} onChange={e=>setTitle(e.target.value)} autoFocus onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&submit()}/></div>
+{!icon&&title.trim()&&suggestEmoji(title)&&<div style={{marginBottom:6,fontSize:11,color:T.mut,display:"flex",alignItems:"center",gap:6,fontFamily:"'JetBrains Mono',monospace"}}>→ アイコン候補: <button style={{background:T.inp,border:"1px solid "+T.brd,borderRadius:6,padding:"3px 10px",fontSize:14,cursor:"pointer"}} onClick={()=>{setIcon(suggestEmoji(title));setIconTouched(true)}}>{suggestEmoji(title)}</button></div>}
+{!isWish&&<>
+<div style={{marginBottom:10}}><div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>重要度</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{IMP.map(o=><button key={o.v} style={{padding:"6px 12px",borderRadius:7,border:"1px solid "+(importance===o.v?o.c:T.brd),fontSize:12,fontWeight:600,cursor:"pointer",background:importance===o.v?o.c:T.cOff,color:importance===o.v?"#fff":T.cOffT,display:"flex",alignItems:"center",gap:4}} onClick={()=>setImportance(o.v)}><span style={{fontSize:13,fontWeight:900}}>{o.icon}</span>{o.l}</button>)}</div></div>
+<div style={{marginBottom:10}}><div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>重さ</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{WI.map(o=>{const c=roi(importance,o.v);return<button key={o.v} style={{padding:"6px 10px",borderRadius:7,border:"1px solid "+(weight===o.v?c:T.brd),fontSize:11,fontWeight:weight===o.v?700:600,cursor:"pointer",background:weight===o.v?c:T.cOff,color:weight===o.v?"#000":T.cOffT}} onClick={()=>setWeight(o.v)}>{o.l}</button>})}</div></div>
+</>}
+<div style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,fontFamily:"'JetBrains Mono',monospace"}}>締切</span><button style={{padding:"3px 10px",borderRadius:7,border:"1px solid "+(!hasDeadline?T.cOn:T.brd),fontSize:10,fontWeight:600,cursor:"pointer",background:!hasDeadline?T.cOn:T.cOff,color:!hasDeadline?T.cOnT:T.cOffT}} onClick={()=>setHasDeadline(v=>!v)}>締切なし</button></div>{hasDeadline&&<input type="datetime-local" style={{width:"100%",padding:"9px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:"none",colorScheme:T.sch}} value={deadline} onChange={e=>setDeadline(e.target.value)}/>}</div>
+{!isWish&&hasDeadline&&<div style={{marginBottom:10}}><div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>繰り返し</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{REC.map(o=><button key={o.v} style={{padding:"6px 12px",borderRadius:7,border:"1px solid "+(recurrence===o.v?T.cOn:T.brd),fontSize:11,fontWeight:600,cursor:"pointer",background:recurrence===o.v?T.cOn:T.cOff,color:recurrence===o.v?T.cOnT:T.cOffT}} onClick={()=>setRecurrence(o.v)}>{o.l}</button>)}</div></div>}
+{!isWish&&<div style={{marginBottom:10}}><div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>場所</div><input style={{width:"100%",padding:"9px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:"none",minWidth:0}} placeholder="例: 自宅" value={location} onChange={e=>{const v=e.target.value;setLocation(v);if(!iconTouched&&locEmojis[v.trim()])setIcon(locEmojis[v.trim()])}} list="pl"/><datalist id="pl">{locs.map(l=><option key={l} value={l}/>)}</datalist>{location.trim()&&locEmojis[location.trim()]&&!iconTouched&&<div style={{fontSize:10,color:T.mut,marginTop:4,fontFamily:"'JetBrains Mono',monospace"}}>→ アイコン自動設定: {locEmojis[location.trim()]}</div>}</div>}
+<div style={{marginBottom:10}}>{formExpandSubs?<div style={{padding:12,background:T.inp,borderRadius:10,border:"1px solid "+T.brd}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+<span style={{fontSize:11,fontWeight:800,color:T.text,letterSpacing:1,textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace"}}>📋 サブタスク</span>
+<div style={{display:"flex",gap:8,alignItems:"center"}}>
+{formSubs.length>0&&<span style={{fontSize:10,color:T.mut,fontFamily:"'JetBrains Mono',monospace"}}>{formSubs.length}件</span>}
+<button style={{background:"none",border:"none",color:T.mut,fontSize:14,cursor:"pointer",padding:"0 4px"}} onClick={()=>{if(formSubs.length===0&&!formSubInput.trim())setFormExpandSubs(false)}} aria-label="閉じる">▴</button>
+</div>
+</div>
+{formSubs.map((sub,i)=><div key={sub.id} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
+<span style={{width:18,height:18,borderRadius:4,border:"2px solid "+T.chk,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:T.dim}}>{i+1}</span>
+<input style={{flex:1,padding:"8px 10px",background:T.card,border:"1px solid "+T.brd,borderRadius:6,color:T.text,fontSize:14,outline:"none",minWidth:0}} value={sub.title} onChange={e=>{const val=e.target.value;setFormSubs(p=>p.map((s,idx)=>idx===i?{...s,title:val}:s))}} placeholder="サブタスク"/>
+<button style={{width:30,height:30,borderRadius:6,border:"1px solid "+T.brd,background:"transparent",color:T.dim,fontSize:14,cursor:"pointer",flexShrink:0}} onClick={()=>setFormSubs(p=>p.filter((_,idx)=>idx!==i))}>✕</button>
+</div>)}
+<div style={{display:"flex",gap:6,marginTop:formSubs.length>0?8:0}}>
+<input style={{flex:1,padding:"10px 12px",background:T.card,border:"1px dashed "+T.brd,borderRadius:8,color:T.text,fontSize:14,outline:"none",minWidth:0}} value={formSubInput} onChange={e=>setFormSubInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing&&formSubInput.trim()){setFormSubs(p=>[...p,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),title:formSubInput.trim(),done:false}]);setFormSubInput("")}}} placeholder="＋ サブタスクを追加してEnter" autoFocus/>
+<button style={{width:44,height:42,borderRadius:8,border:"1px solid "+T.brd,background:formSubInput.trim()?T.cOn:T.cOff,color:formSubInput.trim()?T.cOnT:T.cOffT,fontSize:20,fontWeight:700,cursor:"pointer",flexShrink:0}} onClick={()=>{if(formSubInput.trim()){setFormSubs(p=>[...p,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),title:formSubInput.trim(),done:false}]);setFormSubInput("")}}}>+</button>
+</div>
+</div>:<button style={{padding:"8px 12px",borderRadius:8,border:"1px dashed "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}} onClick={()=>setFormExpandSubs(true)}>+ サブタスク</button>}</div>
+{formExpandMemo?<div style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,fontFamily:"'JetBrains Mono',monospace"}}>メモ</span><button style={{background:"none",border:"none",color:T.mut,fontSize:14,cursor:"pointer",padding:"0 4px"}} onClick={()=>{if(!memo.trim())setFormExpandMemo(false)}} aria-label="閉じる">▴</button></div><textarea style={{width:"100%",padding:"9px 12px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:"none",minHeight:50,resize:"vertical",fontFamily:"inherit"}} placeholder="メモ..." value={memo} onChange={e=>setMemo(e.target.value)} autoFocus/></div>:<div style={{marginBottom:10}}><button style={{padding:"8px 12px",borderRadius:8,border:"1px dashed "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace"}} onClick={()=>setFormExpandMemo(true)}>+ メモ</button></div>}
+<button style={{width:"100%",padding:12,background:"#ff3b30",border:"none",borderRadius:9,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}} onClick={submit}>{editId?"更新する":"追加する"}</button>
 </div>}
 
-{/* HABIT MODE */}
 {isHabit&&<>
 
-  <div style={{display:"flex",gap:6,marginBottom:10}}>
-    <input style={{width:44,padding:"8px 4px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:16,outline:"none",textAlign:"center",flexShrink:0}} placeholder="📌" value={habitIcon} onChange={e=>setHabitIcon(e.target.value)} maxLength={2}/>
-    <input style={{flex:1,padding:"8px 10px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:"none",minWidth:0}} placeholder="日課を追加..." value={habitInput} onChange={e=>setHabitInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing&&habitInput.trim()){setHabits(p=>[...p,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),title:habitInput.trim(),memo:"",icon:habitIcon.trim(),doneToday:false}]);setHabitInput("");setHabitIcon("")}}}/>
-    <button style={{width:40,height:38,borderRadius:8,border:"1px solid "+T.brd,background:habitInput.trim()?T.cOn:T.cOff,color:habitInput.trim()?T.cOnT:T.cOffT,fontSize:18,fontWeight:700,cursor:"pointer",flexShrink:0}} onClick={()=>{if(habitInput.trim()){setHabits(p=>[...p,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),title:habitInput.trim(),memo:"",icon:habitIcon.trim(),doneToday:false}]);setHabitInput("");setHabitIcon("")}}}>+</button>
-  </div>
-  {habitsSorted.map(h=>(
-    <div key={h.id} style={{background:T.card,border:"1px solid "+(editHabitId===h.id?"#ff3b30":T.brd),borderRadius:10,padding:"10px 12px",marginBottom:6,opacity:draggingId===h.id?0.5:(h.doneToday?.4:1),transition:"opacity .2s"}}>
-      {editHabitId===h.id?<div style={{display:"flex",flexDirection:"column",gap:6}}>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <input style={{width:40,padding:"5px 2px",background:T.inp,border:"1px solid "+T.brd,borderRadius:5,color:T.text,fontSize:15,outline:"none",textAlign:"center",flexShrink:0}} placeholder="📌" value={h.icon} onChange={e=>setHabits(p=>p.map(x=>x.id===h.id?{...x,icon:e.target.value}:x))} maxLength={2}/>
-          <input style={{flex:1,padding:"5px 8px",background:T.inp,border:"1px solid "+T.brd,borderRadius:5,color:T.text,fontSize:13,outline:"none",minWidth:0}} value={h.title} onChange={e=>setHabits(p=>p.map(x=>x.id===h.id?{...x,title:e.target.value}:x))}/>
-          <button style={{background:"none",border:"1px solid #4ade80",borderRadius:5,color:"#4ade80",fontSize:11,fontWeight:700,cursor:"pointer",padding:"4px 10px"}} onClick={()=>setEditHabitId(null)}>完了</button>
-        </div>
-        <textarea style={{width:"100%",padding:"6px 8px",background:T.inp,border:"1px solid "+T.brd,borderRadius:5,color:T.text,fontSize:11,outline:"none",minHeight:40,resize:"vertical",fontFamily:"inherit"}} placeholder="メモ..." value={h.memo||""} onChange={e=>setHabits(p=>p.map(x=>x.id===h.id?{...x,memo:e.target.value}:x))}/>
-      </div>:<div style={{display:"flex",alignItems:"center",gap:8}}>
-        <button style={{width:20,height:20,borderRadius:5,border:"2px solid "+(h.doneToday?"#4ade80":T.chk),background:h.doneToday?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,color:"#000",fontSize:10,fontWeight:700}} onClick={()=>{const tdy=new Date();if(tdy.getHours()<dayReset)tdy.setDate(tdy.getDate()-1);const key=tdy.getFullYear()+"-"+String(tdy.getMonth()+1).padStart(2,"0")+"-"+String(tdy.getDate()).padStart(2,"0");const y=new Date(tdy);y.setDate(y.getDate()-1);const yKey=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0");setHabits(p=>p.map(x=>{if(x.id!==h.id)return x;const now=!x.doneToday;if(now){const prev=x.streak||0;const newStreak=x.lastDoneDate===yKey?prev+1:x.lastDoneDate===key?prev:1;fireParticles(1);return{...x,doneToday:true,lastDoneDate:key,streak:newStreak,bestStreak:Math.max(x.bestStreak||0,newStreak)}}return{...x,doneToday:false,lastDoneDate:x.lastDoneDate===key?yKey:x.lastDoneDate,streak:x.lastDoneDate===key?Math.max(0,(x.streak||1)-1):x.streak}}))}}>{h.doneToday&&"✓"}</button>
-        <div style={{fontSize:18,flexShrink:0,width:24,textAlign:"center",cursor:"pointer"}} onClick={()=>setEditHabitId(h.id)}>{h.icon||"📌"}</div>
-        <div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>setEditHabitId(h.id)}><ScrollTitle text={h.title} style={{fontSize:13,fontWeight:500,color:T.text,textDecoration:h.doneToday?"line-through":"none"}}/><div style={{display:"flex",gap:6,alignItems:"center",marginTop:2}}>{h.streak>=2&&<span style={{fontSize:10,color:"#ff9500",fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>🔥 {h.streak}</span>}{h.memo&&<span style={{fontSize:10,color:T.mut,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0,flex:1}}>{h.memo}</span>}</div></div>
-        <div style={{flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",width:28,height:28,color:T.dim,cursor:"grab",touchAction:"none"}} onTouchStart={e=>{e.stopPropagation();dragStart(h.id,"habit",e.touches[0].clientY)}} onTouchMove={e=>{if(draggingId===h.id){e.stopPropagation();dragMove(e.touches[0].clientY)}}} onTouchEnd={e=>{e.stopPropagation();dragEnd()}} onClick={e=>e.stopPropagation()}><Grip/></div>
-        <button style={{background:"none",border:"none",color:T.dim,fontSize:11,cursor:"pointer",padding:4}} onClick={()=>setHabits(p=>p.filter(x=>x.id!==h.id))}>✕</button>
-      </div>}
-    </div>
-  ))}
-  {habits.length===0&&<div style={{textAlign:"center",padding:36,color:T.dim,fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>日課を追加しましょう</div>}
+<div style={{display:"flex",gap:6,marginBottom:10}}>
+<input style={{width:44,padding:"8px 4px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:16,outline:"none",textAlign:"center",flexShrink:0}} placeholder="📌" value={habitIcon} onChange={e=>setHabitIcon(e.target.value)} maxLength={2}/>
+<input style={{flex:1,padding:"8px 10px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:13,outline:"none",minWidth:0}} placeholder="日課を追加..." value={habitInput} onChange={e=>setHabitInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing&&habitInput.trim()){setHabits(p=>[...p,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),title:habitInput.trim(),memo:"",icon:habitIcon.trim(),doneToday:false}]);setHabitInput("");setHabitIcon("")}}}/>
+<button style={{width:40,height:38,borderRadius:8,border:"1px solid "+T.brd,background:habitInput.trim()?T.cOn:T.cOff,color:habitInput.trim()?T.cOnT:T.cOffT,fontSize:18,fontWeight:700,cursor:"pointer",flexShrink:0}} onClick={()=>{if(habitInput.trim()){setHabits(p=>[...p,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),title:habitInput.trim(),memo:"",icon:habitIcon.trim(),doneToday:false}]);setHabitInput("");setHabitIcon("")}}}>+</button>
+</div>
+{habitsSorted.map(h=><HabitCard key={h.id} habit={h} T={T} isEditing={editHabitId===h.id} dragging={draggingId===h.id} onSetEdit={setEditHabitId} onUpdate={u=>setHabits(p=>p.map(x=>x.id===u.id?u:x))} onDelete={()=>setHabits(p=>p.filter(x=>x.id!==h.id))} onToggleDone={()=>togHabitDone(h.id)} onDragStart={y=>dragStart(h.id,"habit",y)} onDragMove={dragMove} onDragEnd={dragEnd}/>)}
+{habits.length===0&&<div style={{textAlign:"center",padding:36,color:T.dim,fontSize:13,fontFamily:"'JetBrains Mono',monospace"}}>日課を追加しましょう</div>}
 </>}
 
-{/* TASK/WISH LIST */}
 {!isHabit&&!isGroupMode&&<div style={{display:“flex”,flexDirection:“column”,gap:8}}>
 {sorted.length===0&&<div style={{textAlign:“center”,padding:36,color:T.dim,fontSize:13,fontFamily:”‘JetBrains Mono’,monospace”}}>{searchQ?“検索結果なし”:filter===“done”?“完了タスクなし”:“タスクを追加しましょう”}</div>}
-{sorted.map(task=><TaskCard key={task.id} task={task} T={T} isDark={isDark} sortOrder={sortOrder} expanded={expandedId===task.id} memoExp={memoExpId===task.id} dragging={draggingId===task.id} draggable={isWish} isToday={todayPicks.includes(task.id)} locEmojis={locEmojis} onToggleExpand={()=>{setExpandedId(expandedId===task.id?null:task.id);setMemoExpId(null)}} onToggleMemo={()=>{setMemoExpId(memoExpId===task.id?null:task.id);setExpandedId(null)}} onToggleDone={()=>togDone(task.id)} onEdit={()=>startEdit(task)} onDelete={()=>delTask(task.id)} onUpdateSubtasks={s=>upSub(task.id,s)} onUpdateMemo={m=>upMemo(task.id,m)} onQuickUpdate={(f,v)=>quickUpdate(task.id,f,v)} onDragStart={y=>dragStart(task.id,“wish”,y)} onDragMove={dragMove} onDragEnd={dragEnd}/>)}
+{sorted.map((task,idx)=>{const useRank=isTask&&sortOrder!==“impGroup”&&sortOrder!==“weightGroup”&&filter!==“done”;const dt=useRank?Math.max(1,Math.min(9,Math.floor(idx/Math.max(1,sorted.length/9))+1)):null;return<TaskCard key={task.id} task={task} T={T} isDark={isDark} sortOrder={sortOrder} expanded={expandedId===task.id} memoExp={memoExpId===task.id} dragging={draggingId===task.id} draggable={isWish} isToday={todayPicks.includes(task.id)} isLatestDone={latestDoneId===task.id} locEmojis={locEmojis} displayTier={dt} onToggleExpand={()=>{setExpandedId(expandedId===task.id?null:task.id);setMemoExpId(null)}} onToggleMemo={()=>{setMemoExpId(memoExpId===task.id?null:task.id);setExpandedId(null)}} onToggleDone={(silent)=>togDone(task.id,silent)} onEdit={()=>startEdit(task)} onDelete={()=>delTask(task.id)} onUpdateSubtasks={s=>upSub(task.id,s)} onUpdateMemo={m=>upMemo(task.id,m)} onQuickUpdate={(f,v)=>quickUpdate(task.id,f,v)} onToggleToday={()=>setTodayPicks(p=>p.includes(task.id)?p.filter(x=>x!==task.id):[…p,task.id])} onFocus={()=>setFocusTaskId(task.id)} onDragStart={y=>dragStart(task.id,“wish”,y)} onDragMove={dragMove} onDragEnd={dragEnd} onSwipeCompleteSound={playCompleteSound}/>})}
 
 </div>}
 
-{/* GROUP MODE (summary accordion) */}
 {isGroupMode&&<div style={{display:“flex”,flexDirection:“column”,gap:6}}>
 {sorted.length===0&&<div style={{textAlign:“center”,padding:36,color:T.dim,fontSize:13,fontFamily:”‘JetBrains Mono’,monospace”}}>タスクなし</div>}
 {groups&&groups.map(g=>(<div key={g.k}>
@@ -543,120 +757,251 @@ return(<div style={{minHeight:“100dvh”,background:T.bg,color:T.text,fontFami
 </button>
 {openGroup===g.k&&<div style={{display:“flex”,flexDirection:“column”,gap:6,marginTop:6,marginBottom:4,paddingLeft:6}}>
 {g.items.length===0&&<div style={{padding:12,color:T.dim,fontSize:11,fontFamily:”‘JetBrains Mono’,monospace”}}>なし</div>}
-{g.items.map(task=><TaskCard key={task.id} task={task} T={T} isDark={isDark} sortOrder={sortOrder} expanded={expandedId===task.id} memoExp={memoExpId===task.id} dragging={false} draggable={false} isToday={todayPicks.includes(task.id)} locEmojis={locEmojis} onToggleExpand={()=>{setExpandedId(expandedId===task.id?null:task.id);setMemoExpId(null)}} onToggleMemo={()=>{setMemoExpId(memoExpId===task.id?null:task.id);setExpandedId(null)}} onToggleDone={()=>togDone(task.id)} onEdit={()=>startEdit(task)} onDelete={()=>delTask(task.id)} onUpdateSubtasks={s=>upSub(task.id,s)} onUpdateMemo={m=>upMemo(task.id,m)} onQuickUpdate={(f,v)=>quickUpdate(task.id,f,v)}/>)}
+{g.items.map(task=><TaskCard key={task.id} task={task} T={T} isDark={isDark} sortOrder={sortOrder} expanded={expandedId===task.id} memoExp={memoExpId===task.id} dragging={false} draggable={false} isToday={todayPicks.includes(task.id)} locEmojis={locEmojis} onToggleExpand={()=>{setExpandedId(expandedId===task.id?null:task.id);setMemoExpId(null)}} onToggleMemo={()=>{setMemoExpId(memoExpId===task.id?null:task.id);setExpandedId(null)}} onToggleDone={()=>togDone(task.id)} onEdit={()=>startEdit(task)} onDelete={()=>delTask(task.id)} onUpdateSubtasks={s=>upSub(task.id,s)} onUpdateMemo={m=>upMemo(task.id,m)} onQuickUpdate={(f,v)=>quickUpdate(task.id,f,v)} onFocus={()=>setFocusTaskId(task.id)}/>)}
+
+</div>}
+</div>))}
 </div>}
 
-  </div>))}
-</div>}
+{showWeekReport&&weekReportStats&&<div style={{position:“fixed”,top:0,left:0,right:0,bottom:0,background:T.modal,zIndex:240,display:“flex”,alignItems:“flex-start”,justifyContent:“center”,padding:“40px 16px 20px”,overflowY:“auto”}}><div style={{background:T.card,border:“1px solid “+T.brd,borderRadius:16,padding:20,width:“100%”,maxWidth:420}}>
 
-{/* Settings */}
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}><span style={{fontSize:15,fontWeight:800,color:T.text}}>📊 今週のふりかえり</span><button style={{background:"none",border:"none",color:T.mut,fontSize:16,cursor:"pointer"}} onClick={()=>setShowWeekReport(false)}>✕</button></div>
+<div style={{textAlign:"center",marginBottom:16}}><div style={{fontSize:42,fontWeight:900,color:"#4ade80",fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{weekReportStats.weekDone}</div><div style={{fontSize:11,color:T.mut,marginTop:4,fontFamily:"'JetBrains Mono',monospace",letterSpacing:1}}>件 完了</div></div>
+<div style={{marginBottom:16}}><div style={{fontSize:10,fontWeight:700,color:T.mut,marginBottom:8,fontFamily:"'JetBrains Mono',monospace",letterSpacing:1}}>日別の完了数</div>
+<div style={{display:"flex",alignItems:"flex-end",gap:4,height:80}}>{weekReportStats.days.map((dy,i)=>{const max=Math.max(1,...weekReportStats.days.map(d=>d.count));const h=(dy.count/max)*60;return<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}><div style={{width:"100%",height:60,display:"flex",alignItems:"flex-end"}}><div style={{width:"100%",height:h+"px",background:dy.count>0?"#c084fc":T.dim,borderRadius:"3px 3px 0 0",minHeight:dy.count>0?4:2}}/></div><span style={{fontSize:9,color:T.mut,fontFamily:"'JetBrains Mono',monospace"}}>{dy.label}</span><span style={{fontSize:10,color:T.text,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>{dy.count}</span></div>})}</div></div>
+<div style={{padding:12,background:T.inp,borderRadius:10,border:"1px solid "+T.brd,marginBottom:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,marginBottom:6,fontFamily:"'JetBrains Mono',monospace",letterSpacing:1}}>来週(今後7日)の予定</div><div style={{display:"flex",gap:14,fontSize:13}}><div><span style={{color:"#ff3b30",fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{weekReportStats.nextNow}</span><span style={{color:T.mut,fontSize:10,marginLeft:4}}>NOW</span></div><div><span style={{color:"#ff9500",fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{weekReportStats.nextSoon}</span><span style={{color:T.mut,fontSize:10,marginLeft:4}}>SOON</span></div></div></div>
+<button style={{width:"100%",padding:12,borderRadius:10,border:"none",background:"#4ade80",color:"#000",fontSize:14,fontWeight:800,cursor:"pointer"}} onClick={()=>setShowWeekReport(false)}>OK</button>
+</div></div>}
+
+{showMonthReset&&monthResetTasks.length>0&&<div style={{position:“fixed”,top:0,left:0,right:0,bottom:0,background:T.modal,zIndex:240,display:“flex”,alignItems:“flex-start”,justifyContent:“center”,padding:“40px 16px 20px”,overflowY:“auto”}}><div style={{background:T.card,border:“1px solid “+T.brd,borderRadius:16,padding:20,width:“100%”,maxWidth:420}}>
+
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:15,fontWeight:800,color:T.text}}>📅 先月のやり残し</span><button style={{background:"none",border:"none",color:T.mut,fontSize:16,cursor:"pointer"}} onClick={()=>setShowMonthReset(false)}>✕</button></div>
+<div style={{fontSize:11,color:T.mut,marginBottom:14,fontFamily:"'JetBrains Mono',monospace"}}>{monthResetTasks.length}件のタスクをどうしますか?</div>
+<div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:"55vh",overflowY:"auto",marginBottom:12}}>{monthResetTasks.map(t=>{const c=roi(t.importance,t.weight);return<div key={t.id} style={{padding:10,background:T.inp,border:"1px solid "+T.brd,borderRadius:9}}>
+<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{width:3,height:18,background:c,borderRadius:2,flexShrink:0}}/>{t.icon&&<span style={{fontSize:14,flexShrink:0}}>{t.icon}</span>}<span style={{flex:1,fontSize:13,fontWeight:600,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</span></div>
+<div style={{display:"flex",gap:6}}><button style={{flex:1,padding:"7px 6px",borderRadius:6,border:"1px solid #4ade80",background:"rgba(74,222,128,0.12)",color:"#4ade80",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>monthAction(t.id,"keep")}>今月もやる</button><button style={{flex:1,padding:"7px 6px",borderRadius:6,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>monthAction(t.id,"next")}>来月送り</button><button style={{flex:1,padding:"7px 6px",borderRadius:6,border:"1px solid rgba(255,59,48,0.4)",background:"transparent",color:"#ff3b30",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>monthAction(t.id,"trash")}>やめる</button></div>
+</div>})}</div>
+<button style={{width:"100%",padding:11,borderRadius:9,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>setShowMonthReset(false)}>あとで決める</button>
+</div></div>}
+
 {showSettings&&<div style={{position:“fixed”,top:0,left:0,right:0,bottom:0,background:T.modal,zIndex:100,display:“flex”,alignItems:“flex-start”,justifyContent:“center”,padding:“60px 16px 20px”,overflowY:“auto”}} onClick={()=>setShowSettings(false)}><div style={{background:T.card,border:“1px solid “+T.brd,borderRadius:16,padding:20,width:“100%”,maxWidth:500}} onClick={e=>e.stopPropagation()}>
 
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}><span style={{fontSize:15,fontWeight:700,color:T.text}}>設定</span><button style={{background:"none",border:"none",color:T.mut,fontSize:16,cursor:"pointer"}} onClick={()=>setShowSettings(false)}>✕</button></div>
-  <div style={{marginBottom:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>日付変更時刻</div><input type="number" min="0" max="23" style={{width:60,padding:"8px 10px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:14,outline:"none"}} value={dayReset} onChange={e=>setDayReset(parseInt(e.target.value)||0)}/><span style={{fontSize:11,color:T.mut,marginLeft:6}}>時</span></div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}><span style={{fontSize:15,fontWeight:700,color:T.text}}>設定</span><button style={{background:"none",border:"none",color:T.mut,fontSize:16,cursor:"pointer"}} onClick={()=>setShowSettings(false)}>✕</button></div>
 
-  <div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}>
-    <div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>今やるべきタスクの表示件数</div>
-    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[3,4,5,6,7].map(n=><button key={n} style={{padding:"6px 14px",borderRadius:7,border:"1px solid "+(bannerCount===n?T.cOn:T.brd),fontSize:12,fontWeight:700,cursor:"pointer",background:bannerCount===n?T.cOn:T.cOff,color:bannerCount===n?T.cOnT:T.cOffT}} onClick={()=>setBannerCount(n)}>{n}件</button>)}</div>
-  </div>
+<div style={{marginBottom:14}}>
+<div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontFamily:"'JetBrains Mono',monospace"}}>この1週間の完了数</div>
+<div style={{display:"flex",alignItems:"stretch",gap:4,padding:"0 2px"}}>
+{weekChart.map((dy,i)=>{const max=Math.max(1,...weekChart.map(d=>d.count));const h=(dy.count/max)*60;const isToday=i===weekChart.length-1;return<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+<div style={{width:"100%",height:64,display:"flex",alignItems:"flex-end"}}><div style={{width:"100%",height:h+"px",background:dy.count>0?(isToday?"#4ade80":"#c084fc"):T.dim,borderRadius:"3px 3px 0 0",minHeight:dy.count>0?4:2,transition:"height .3s"}}/></div>
+<span style={{fontSize:9,color:isToday?"#4ade80":T.mut,fontFamily:"'JetBrains Mono',monospace",fontWeight:isToday?700:400,lineHeight:1}}>{dy.label}</span>
+<span style={{fontSize:10,color:T.text,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,lineHeight:1}}>{dy.count}</span>
+</div>})}
+</div>
+</div>
 
-{/* Place management (B4) */}
+<div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>バックアップ・復元</div><div style={{display:"flex",gap:8}}><button style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+T.brd,background:T.cOff,color:T.text,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={doExport}>エクスポート</button><button style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+T.brd,background:T.cOff,color:T.text,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={doImportClick}>インポート</button><input ref={fr} type="file" accept="application/json" style={{display:"none"}} onChange={doImport}/></div></div>
 
-  <div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}>
-    <div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>場所の管理</div>
-    {locs.length===0&&<div style={{fontSize:11,color:T.dim,padding:"4px 0"}}>タスクに場所を設定すると、ここで絵文字を管理できます</div>}
-    {locs.map(l=><div key={l} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 0",borderBottom:"1px solid "+(isDark?"#1a1a1a":T.brd)}}>
-      <input style={{width:42,padding:"5px",background:T.inp,border:"1px solid "+T.brd,borderRadius:6,color:T.text,fontSize:14,outline:"none",textAlign:"center",flexShrink:0}} placeholder="📌" value={locEmojis[l]||""} onChange={e=>setLocEmojis(prev=>({...prev,[l]:e.target.value}))} maxLength={2}/>
-      <input style={{flex:1,padding:"6px 8px",background:T.inp,border:"1px solid "+T.brd,borderRadius:6,color:T.text,fontSize:12,outline:"none",minWidth:0}} defaultValue={l} onBlur={e=>renameLocation(l,e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing){e.target.blur()}}}/>
-      <button style={{width:28,height:28,borderRadius:6,border:"1px solid rgba(255,59,48,0.3)",background:"transparent",color:"#ff3b30",fontSize:11,cursor:"pointer",flexShrink:0}} onClick={()=>deleteLocation(l)} aria-label="削除">✕</button>
-    </div>)}
-  </div>
+<div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>今日やる3つ(朝の選択)</div>
+<div style={{fontSize:11,color:T.sub,marginBottom:7}}>現在の選択: {todayPicks.length}件</div>
+<div style={{display:"flex",gap:8}}>
+<button style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+T.brd,background:T.cOff,color:T.text,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>{setShowSettings(false);setShowPicker(true)}}>選び直す</button>
+{todayPicks.length>0&&<button style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>setTodayPicks([])}>クリア</button>}
+</div>
+</div>
 
-  <div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>今日の3選択</div>
-    <div style={{fontSize:11,color:T.sub,marginBottom:7}}>現在の選択: {todayPicks.length}件</div>
-    <div style={{display:"flex",gap:8}}>
-      <button style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+T.brd,background:T.cOff,color:T.text,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>{setShowSettings(false);setShowPicker(true)}}>選び直す</button>
-      {todayPicks.length>0&&<button style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>setTodayPicks([])}>クリア</button>}
-    </div>
-  </div>
+<div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}>
+<div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>場所の管理</div>
+{locs.length===0&&<div style={{fontSize:11,color:T.dim,padding:"4px 0"}}>タスクに場所を設定すると、ここで絵文字を管理できます</div>}
+{locs.map(l=><div key={l} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 0",borderBottom:"1px solid "+(isDark?"#1a1a1a":T.brd)}}>
+<input style={{width:42,padding:"5px",background:T.inp,border:"1px solid "+T.brd,borderRadius:6,color:T.text,fontSize:14,outline:"none",textAlign:"center",flexShrink:0}} placeholder="📌" value={locEmojis[l]||""} onChange={e=>setLocEmojis(prev=>({...prev,[l]:e.target.value}))} maxLength={2}/>
+<input style={{flex:1,padding:"6px 8px",background:T.inp,border:"1px solid "+T.brd,borderRadius:6,color:T.text,fontSize:12,outline:"none",minWidth:0}} defaultValue={l} onBlur={e=>renameLocation(l,e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing){e.target.blur()}}}/>
+<button style={{width:28,height:28,borderRadius:6,border:"1px solid rgba(255,59,48,0.3)",background:"transparent",color:"#ff3b30",fontSize:11,cursor:"pointer",flexShrink:0}} onClick={()=>deleteLocation(l)} aria-label="削除">✕</button>
+</div>)}
+</div>
 
-  <div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>データ</div><div style={{display:"flex",gap:8}}><button style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+T.brd,background:T.cOff,color:T.text,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={doExport}>エクスポート</button><button style={{flex:1,padding:10,borderRadius:9,border:"1px solid "+T.brd,background:T.cOff,color:T.text,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={doImportClick}>インポート</button><input ref={fr} type="file" accept="application/json" style={{display:"none"}} onChange={doImport}/></div></div>
-  <div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>ゴミ箱（{trash.length}件）</div>
-    {trash.map(t=><div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+(isDark?"#1a1a1a":T.brd)}}><span style={{fontSize:12,color:T.sub}}>{t.icon?t.icon+" ":""}{t.title}</span><button style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(34,197,94,0.3)",background:"transparent",color:"#4ade80",fontSize:10,fontWeight:600,cursor:"pointer"}} onClick={()=>restoreTask(t.id)}>復元</button></div>)}
-    {trash.length>0&&<button style={{marginTop:8,padding:"6px 12px",borderRadius:8,border:"1px solid rgba(255,59,48,0.3)",background:"transparent",color:"#ff3b30",fontSize:11,fontWeight:600,cursor:"pointer"}} onClick={()=>{if(confirm("ゴミ箱を空にしますか？"))setTrash([])}}>ゴミ箱を空にする</button>}
-  </div>
+<div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}>
+<div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>今やるべきタスクの表示件数</div>
+<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{[3,4,5,6,7].map(n=><button key={n} style={{padding:"6px 14px",borderRadius:7,border:"1px solid "+(bannerCount===n?T.cOn:T.brd),fontSize:12,fontWeight:700,cursor:"pointer",background:bannerCount===n?T.cOn:T.cOff,color:bannerCount===n?T.cOnT:T.cOffT}} onClick={()=>setBannerCount(n)}>{n}件</button>)}</div>
+</div>
+
+<div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}>
+<div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>効果音</div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+<span style={{fontSize:12,color:T.sub}}>完了時の効果音</span>
+<button style={{width:44,height:24,borderRadius:12,border:"none",background:soundEnabled?"#4ade80":T.dim,position:"relative",cursor:"pointer",transition:"background .2s"}} onClick={async()=>{const next=!soundEnabled;setSoundEnabled(next);if(next){try{await ensureAudio();playSoundOnBuf()}catch{}}}}>
+<span style={{position:"absolute",top:2,left:soundEnabled?22:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+</button>
+</div>
+{soundEnabled&&<div style={{padding:"6px 0",borderTop:"1px solid "+T.brd,marginTop:4}}>
+<div style={{fontSize:11,fontWeight:700,color:T.mut,marginBottom:6,letterSpacing:1,fontFamily:"'JetBrains Mono',monospace"}}>カスタム音声</div>
+<div style={{fontSize:11,color:T.dim,marginBottom:8,lineHeight:1.5}}>{customSoundName?"現在: "+customSoundName:"デフォルト音声を使用中"}</div>
+<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+<label style={{flex:1,minWidth:120,padding:"9px 12px",borderRadius:8,border:"1px solid "+T.brd,background:T.inp,color:T.text,fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"center",display:"inline-block"}}>
+ファイルを選ぶ
+<input type="file" accept=".mp3,.m4a,.wav,.aac,.ogg,.mp4,.mov,audio/mpeg,audio/mp4,audio/wav,audio/aac,audio/ogg,video/mp4,video/quicktime" style={{display:"none"}} onChange={async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const ok=await setCustomSound(f);if(ok){try{await ensureAudio();playSoundOnBuf()}catch{}}else{alert("読み込みに失敗しました")}e.target.value=""}}/>
+</label>
+{customSoundName&&<button style={{padding:"9px 12px",borderRadius:8,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}} onClick={async()=>{await resetCustomSound()}}>デフォルトに戻す</button>}
+<button style={{padding:"9px 12px",borderRadius:8,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:600,cursor:"pointer"}} onClick={async()=>{await ensureAudio();playSoundOnBuf()}}>▶ 試聴</button>
+</div>
+<div style={{fontSize:10,color:T.dim,marginTop:6,lineHeight:1.5}}>※ mp3 / m4a / wav / mp4 / mov などの音声・動画ファイル対応(動画は音声のみ抽出)</div>
+</div>}
+</div>
+
+<div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}>
+<div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>表示</div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+<span style={{fontSize:12,color:T.sub}}>色覚多様性モード(青・黄・茶ベース)</span>
+<button style={{width:44,height:24,borderRadius:12,border:"none",background:colorBlindMode?"#4ade80":T.dim,position:"relative",cursor:"pointer",transition:"background .2s"}} onClick={()=>setColorBlindMode(v=>!v)}>
+<span style={{position:"absolute",top:2,left:colorBlindMode?22:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+</button>
+</div>
+</div>
+
+<div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>新規タスクのデフォルト</div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+<span style={{fontSize:12,color:T.sub}}>新規タスク作成時、締切入力欄を最初から表示</span>
+<button style={{width:44,height:24,borderRadius:12,border:"none",background:defaults.hasDeadline?"#4ade80":T.dim,position:"relative",cursor:"pointer",transition:"background .2s"}} onClick={()=>setDefaults(p=>({...p,hasDeadline:!p.hasDeadline}))}>
+<span style={{position:"absolute",top:2,left:defaults.hasDeadline?22:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+</button>
+</div>
+</div>
+
+<div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>1日の境目(時)</div><input type="number" min="0" max="23" style={{width:60,padding:"8px 10px",background:T.inp,border:"1px solid "+T.brd,borderRadius:8,color:T.text,fontSize:14,outline:"none"}} value={dayReset} onChange={e=>setDayReset(parseInt(e.target.value)||0)}/><span style={{fontSize:11,color:T.mut,marginLeft:6}}>時</span></div>
+
+<div style={{marginBottom:14,borderTop:"1px solid "+T.brd,paddingTop:14}}><div style={{fontSize:10,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:7,fontFamily:"'JetBrains Mono',monospace"}}>ゴミ箱({trash.length}件)</div>
+{trash.map(t=><div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid "+(isDark?"#1a1a1a":T.brd)}}><span style={{fontSize:12,color:T.sub}}>{t.icon?t.icon+" ":""}{t.title}</span><button style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(34,197,94,0.3)",background:"transparent",color:"#4ade80",fontSize:10,fontWeight:600,cursor:"pointer"}} onClick={()=>restoreTask(t.id)}>復元</button></div>)}
+{trash.length>0&&<button style={{marginTop:8,padding:"6px 12px",borderRadius:8,border:"1px solid rgba(255,59,48,0.3)",background:"transparent",color:"#ff3b30",fontSize:11,fontWeight:600,cursor:"pointer"}} onClick={()=>{if(confirm("ゴミ箱を空にしますか?"))setTrash([])}}>ゴミ箱を空にする</button>}
+</div>
 </div></div>}
 
-{/* Quota warning (data full) */}
+{focusTaskId&&(()=>{const ft=tasks.find(t=>t.id===focusTaskId);if(!ft){setFocusTaskId(null);return null}const fsubs=ft.subtasks||[];const fsd=fsubs.filter(s=>s.done).length;return(<div style={{position:“fixed”,top:0,left:0,right:0,bottom:0,background:T.bg,zIndex:280,display:“flex”,flexDirection:“column”,padding:“calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom))”,overflowY:“auto”}}>
+
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+<span style={{fontSize:10,fontWeight:700,color:T.mut,fontFamily:"'JetBrains Mono',monospace",letterSpacing:2}}>FOCUS MODE</span>
+<button style={{background:"none",border:"none",color:T.mut,fontSize:24,cursor:"pointer",padding:4}} onClick={()=>setFocusTaskId(null)}>✕</button>
+</div>
+<div style={{flex:1,display:"flex",flexDirection:"column",gap:20,paddingTop:8}}>
+{ft.icon&&<div style={{fontSize:64,textAlign:"center"}}>{ft.icon}</div>}
+<div style={{fontSize:24,fontWeight:800,color:T.text,textAlign:"center",lineHeight:1.3,padding:"0 8px"}}>{ft.title}</div>
+{ft.deadline&&<div style={{fontSize:13,color:T.sub,textAlign:"center",fontFamily:"'JetBrains Mono',monospace"}}>⏰ {fmtDl(ft.deadline)}</div>}
+{ft.memo&&<div style={{background:T.memo,border:"1px solid "+T.memB,borderRadius:12,padding:16,fontSize:14,lineHeight:1.7,color:T.sub,whiteSpace:"pre-wrap"}}>{ft.memo}</div>}
+{fsubs.length>0&&<div style={{background:T.inp,borderRadius:12,padding:16,border:"1px solid "+T.brd}}>
+<div style={{fontSize:10,fontWeight:700,color:T.mut,marginBottom:10,fontFamily:"'JetBrains Mono',monospace",letterSpacing:1}}>サブタスク {fsd}/{fsubs.length}</div>
+{fsubs.map(sub=><div key={sub.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0"}}>
+<button style={{width:22,height:22,borderRadius:6,border:"2px solid "+(sub.done?"#4ade80":T.chk),background:sub.done?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,color:"#000",fontSize:12,fontWeight:800}} onClick={()=>upSub(focusTaskId,fsubs.map(s=>s.id===sub.id?{...s,done:!s.done}:s))}>{sub.done&&"✓"}</button>
+<span style={{fontSize:15,color:sub.done?T.mut:T.text,opacity:sub.done?0.5:1,flex:1,lineHeight:1.4,textDecoration:sub.done?"line-through":"none"}}>{sub.title}</span>
+</div>)}
+</div>}
+</div>
+<div style={{display:"flex",gap:10,marginTop:24}}>
+<button style={{flex:1,padding:"16px",borderRadius:12,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={()=>setFocusTaskId(null)}>後で</button>
+<button style={{flex:2,padding:"16px",borderRadius:12,border:"none",background:"#4ade80",color:"#000",fontSize:15,fontWeight:800,cursor:"pointer",letterSpacing:1}} onClick={()=>{togDone(focusTaskId);setFocusTaskId(null)}}>✓ 完了</button>
+</div>
+</div>)})()}
+
 {showQuotaWarn&&<div style={{position:“fixed”,top:0,left:0,right:0,bottom:0,background:T.modal,zIndex:260,display:“flex”,alignItems:“center”,justifyContent:“center”,padding:16}}><div style={{background:T.card,border:“1px solid #ff3b30”,borderRadius:14,padding:20,width:“100%”,maxWidth:360}}>
 
-  <div style={{fontSize:16,fontWeight:800,color:"#ff3b30",marginBottom:8}}>⚠ 保存容量がいっぱいです</div>
-  <div style={{fontSize:12,color:T.sub,marginBottom:16,lineHeight:1.6}}>新しい変更が保存できていません。完了タスクや古いゴミ箱を整理するか、データをエクスポートしてバックアップしてください。</div>
-  <div style={{display:"flex",gap:8}}>
-    <button style={{flex:1,padding:11,borderRadius:9,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>setShowQuotaWarn(false)}>閉じる</button>
-    <button style={{flex:1,padding:11,borderRadius:9,border:"none",background:"#ff3b30",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>{doExport();setShowQuotaWarn(false)}}>エクスポート</button>
-  </div>
+<div style={{fontSize:16,fontWeight:800,color:"#ff3b30",marginBottom:8}}>⚠ 保存容量がいっぱいです</div>
+<div style={{fontSize:12,color:T.sub,marginBottom:16,lineHeight:1.6}}>新しい変更が保存できていません。完了タスクや古いゴミ箱を整理するか、データをエクスポートしてバックアップしてください。</div>
+<div style={{display:"flex",gap:8}}>
+<button style={{flex:1,padding:11,borderRadius:9,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>setShowQuotaWarn(false)}>閉じる</button>
+<button style={{flex:1,padding:11,borderRadius:9,border:"none",background:"#ff3b30",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>{doExport();setShowQuotaWarn(false)}}>エクスポート</button>
+</div>
 </div></div>}
 
-{/* Particles overlay (C2) */}
 {particles.length>0&&<div style={{position:“fixed”,inset:0,pointerEvents:“none”,zIndex:300,overflow:“hidden”}}>
 
 <div style={{position:"absolute",left:"50%",top:"45%"}}>
 {particles.map(p=><Particle key={p.id} p={p}/>)}
 </div></div>}
 
-{/* Backup nudge (C4) */}
 {showBackupNudge&&<div style={{position:“fixed”,top:0,left:0,right:0,bottom:0,background:T.modal,zIndex:250,display:“flex”,alignItems:“center”,justifyContent:“center”,padding:16}} onClick={()=>setShowBackupNudge(false)}><div style={{background:T.card,border:“1px solid “+T.brd,borderRadius:14,padding:20,width:“100%”,maxWidth:360}} onClick={e=>e.stopPropagation()}>
 
-  <div style={{fontSize:16,fontWeight:800,color:T.text,marginBottom:8}}>💾 バックアップしませんか？</div>
-  <div style={{fontSize:12,color:T.sub,marginBottom:16,lineHeight:1.6}}>最後のエクスポートから7日以上経過しています。データを書き出して保管しておきましょう。</div>
-  <div style={{display:"flex",gap:8}}>
-    <button style={{flex:1,padding:11,borderRadius:9,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>setShowBackupNudge(false)}>あとで</button>
-    <button style={{flex:1,padding:11,borderRadius:9,border:"none",background:"#ff3b30",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>{doExport();setShowBackupNudge(false)}}>エクスポート</button>
-  </div>
+<div style={{fontSize:16,fontWeight:800,color:T.text,marginBottom:8}}>💾 バックアップしませんか?</div>
+<div style={{fontSize:12,color:T.sub,marginBottom:16,lineHeight:1.6}}>最後のエクスポートから7日以上経過しています。データを書き出して保管しておきましょう。</div>
+<div style={{display:"flex",gap:8}}>
+<button style={{flex:1,padding:11,borderRadius:9,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>setShowBackupNudge(false)}>あとで</button>
+<button style={{flex:1,padding:11,borderRadius:9,border:"none",background:"#ff3b30",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>{doExport();setShowBackupNudge(false)}}>エクスポート</button>
+</div>
 </div></div>}
 
-{/* Morning picker (C5) */}
 {showPicker&&<div style={{position:“fixed”,top:0,left:0,right:0,bottom:0,background:T.modal,zIndex:250,display:“flex”,alignItems:“flex-start”,justifyContent:“center”,padding:“40px 16px 20px”,overflowY:“auto”}}><div style={{background:T.card,border:“1px solid “+T.brd,borderRadius:16,padding:20,width:“100%”,maxWidth:500}}>
 
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:16,fontWeight:800,color:T.text}}>🌅 今日やる3つを選ぼう</span><button style={{background:"none",border:"none",color:T.mut,fontSize:16,cursor:"pointer"}} onClick={()=>setShowPicker(false)}>✕</button></div>
-  <div style={{fontSize:11,color:T.mut,marginBottom:12,fontFamily:"'JetBrains Mono',monospace"}}>選択: {todayPicks.length}/3</div>
-  <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:14,maxHeight:"50vh",overflowY:"auto"}}>
-    {tasks.filter(t=>!t.done&&t.type!=="wish").map(t=>{const on=todayPicks.includes(t.id);const dis=!on&&todayPicks.length>=3;const c=roi(t.importance,t.weight);return<button key={t.id} disabled={dis} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:8,border:"1px solid "+(on?"#4ade80":T.brd),background:on?"rgba(74,222,128,0.12)":T.inp,color:T.text,fontSize:13,cursor:dis?"not-allowed":"pointer",opacity:dis?.4:1,textAlign:"left",width:"100%"}} onClick={()=>setTodayPicks(p=>on?p.filter(x=>x!==t.id):[...p,t.id])}>
-      <span style={{width:16,height:16,borderRadius:4,border:"2px solid "+(on?"#4ade80":T.chk),background:on?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"#000",fontSize:9,fontWeight:800}}>{on?"✓":""}</span>
-      <span style={{width:3,height:18,background:c,borderRadius:2,flexShrink:0}}/>
-      {t.icon&&<span style={{fontSize:14,flexShrink:0}}>{t.icon}</span>}
-      <span style={{flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</span>
-      <span style={{fontSize:9,color:T.mut,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{fmtDl(t.deadline)}</span>
-    </button>})}
-  </div>
-  <div style={{display:"flex",gap:8}}>
-    <button style={{flex:1,padding:11,borderRadius:9,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>{setTodayPicks([]);setShowPicker(false)}}>スキップ</button>
-    <button style={{flex:1,padding:11,borderRadius:9,border:"none",background:todayPicks.length===0?T.dim:"#4ade80",color:"#000",fontSize:12,fontWeight:800,cursor:"pointer"}} onClick={()=>setShowPicker(false)}>決定 ({todayPicks.length})</button>
-  </div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:16,fontWeight:800,color:T.text}}>🌅 今日やる3つを選ぼう</span><button style={{background:"none",border:"none",color:T.mut,fontSize:16,cursor:"pointer"}} onClick={()=>setShowPicker(false)}>✕</button></div>
+<div style={{fontSize:11,color:T.mut,marginBottom:12,fontFamily:"'JetBrains Mono',monospace"}}>選択: {todayPicks.length}/3</div>
+<div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:14,maxHeight:"50vh",overflowY:"auto"}}>
+{tasks.filter(t=>!t.done&&t.type!=="wish").map(t=>{const on=todayPicks.includes(t.id);const dis=!on&&todayPicks.length>=3;const c=roi(t.importance,t.weight);return<button key={t.id} disabled={dis} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:8,border:"1px solid "+(on?"#4ade80":T.brd),background:on?"rgba(74,222,128,0.12)":T.inp,color:T.text,fontSize:13,cursor:dis?"not-allowed":"pointer",opacity:dis?.4:1,textAlign:"left",width:"100%"}} onClick={()=>setTodayPicks(p=>on?p.filter(x=>x!==t.id):[...p,t.id])}>
+<span style={{width:16,height:16,borderRadius:4,border:"2px solid "+(on?"#4ade80":T.chk),background:on?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"#000",fontSize:9,fontWeight:800}}>{on?"✓":""}</span>
+<span style={{width:3,height:18,background:c,borderRadius:2,flexShrink:0}}/>
+{t.icon&&<span style={{fontSize:14,flexShrink:0}}>{t.icon}</span>}
+<span style={{flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.title}</span>
+<span style={{fontSize:9,color:T.mut,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{fmtDl(t.deadline)}</span>
+</button>})}
+</div>
+<div style={{display:"flex",gap:8}}>
+<button style={{flex:1,padding:11,borderRadius:9,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>{setTodayPicks([]);setShowPicker(false)}}>スキップ</button>
+<button style={{flex:1,padding:11,borderRadius:9,border:"none",background:todayPicks.length===0?T.dim:"#4ade80",color:"#000",fontSize:12,fontWeight:800,cursor:"pointer"}} onClick={()=>setShowPicker(false)}>決定 ({todayPicks.length})</button>
+</div>
 </div></div>}
 
-{/* Undo toast */}
 {undoData&&<div className=“form-slide” style={{position:“fixed”,bottom:“calc(24px + env(safe-area-inset-bottom))”,left:16,right:16,maxWidth:360,margin:“0 auto”,background:T.toast,border:“1px solid “+T.brd,borderRadius:10,padding:“12px 16px”,display:“flex”,alignItems:“center”,justifyContent:“space-between”,fontSize:13,color:T.sub,zIndex:200}}><span>削除しました</span><button style={{background:“none”,border:“none”,color:”#ff3b30”,fontWeight:700,cursor:“pointer”,fontSize:13}} onClick={undo}>元に戻す</button></div>}
 
-<div style={{position:"fixed",bottom:6,right:10,fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:T.dim,userSelect:"none",pointerEvents:"none"}}>v{VER}</div>
+{!showForm&&!isHabit&&!focusTaskId&&!showSettings&&!showPicker&&!showWeekReport&&!showMonthReset&&!showQuotaWarn&&!showBackupNudge&&!expandedId&&!memoExpId&&<button style={{position:“fixed”,bottom:“calc(”+(undoData?108:52)+“px + env(safe-area-inset-bottom))”,right:20,width:56,height:56,borderRadius:“50%”,border:“none”,background:”#ff3b30”,color:”#fff”,fontSize:32,fontWeight:300,cursor:“pointer”,boxShadow:“0 4px 16px rgba(255,59,48,0.35),0 2px 6px rgba(0,0,0,0.2)”,display:“flex”,alignItems:“center”,justifyContent:“center”,zIndex:150,padding:0,lineHeight:1,touchAction:“manipulation”,transition:“bottom .2s”}} onClick={()=>{resetForm();setShowForm(true)}} aria-label={isWish?“やりたいことを追加”:“新しいタスク”}>+</button>}
 
-  </div>)
+<div style={{position:"fixed",bottom:6,right:10,fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:T.dim,userSelect:"none",pointerEvents:"none"}}>v{VER}</div>
+</div>)
 }
 
-function TaskCard({task,T,isDark,sortOrder,expanded,memoExp,dragging,draggable,isToday,locEmojis={},onToggleExpand,onToggleMemo,onToggleDone,onEdit,onDelete,onUpdateSubtasks,onUpdateMemo,onQuickUpdate,onDragStart,onDragMove,onDragEnd}){
+const HabitCard=memo(function HabitCard({habit,T,isEditing,onSetEdit,onUpdate,onDelete,onToggleDone,onDragStart,onDragMove,onDragEnd,dragging}){
+const SWIPE_THRESHOLD=Math.max(100,Math.min(160,(typeof window!==“undefined”?window.innerWidth:400)*0.3));
+const BOTTOM_GUARD=60;
+const[swipeOffset,setSwipeOffset]=useState(0);
+const[swipeAnimating,setSwipeAnimating]=useState(false);
+const swipeBlockedRef=useRef(false);
+const swipeProgress=Math.min(1,Math.abs(swipeOffset)/SWIPE_THRESHOLD);
+const swipeReady=Math.abs(swipeOffset)>=SWIPE_THRESHOLD;
+const swipeHandlers=useSwipeable({
+onSwipeStart:(e)=>{const startY=e.event.touches?e.event.touches[0].clientY:e.event.clientY;if(startY>=window.innerHeight-BOTTOM_GUARD){swipeBlockedRef.current=true;return}swipeBlockedRef.current=false},
+onSwiping:(e)=>{if(swipeBlockedRef.current)return;if(isEditing)return;if(e.dir!==“Left”&&e.dir!==“Right”)return;let off=e.deltaX;if(Math.abs(off)>SWIPE_THRESHOLD){const excess=Math.abs(off)-SWIPE_THRESHOLD;off=Math.sign(off)*(SWIPE_THRESHOLD+excess*0.4)}setSwipeAnimating(false);setSwipeOffset(off)},
+onSwiped:(e)=>{if(swipeBlockedRef.current){swipeBlockedRef.current=false;setSwipeOffset(0);return}if(isEditing){setSwipeOffset(0);return}if(e.dir!==“Left”&&e.dir!==“Right”){setSwipeOffset(0);return}const off=e.deltaX;setSwipeAnimating(true);if(off<=-SWIPE_THRESHOLD){setSwipeOffset(-600);setTimeout(()=>{onDelete();setSwipeOffset(0);setSwipeAnimating(false)},180)}else if(off>=SWIPE_THRESHOLD){setSwipeOffset(600);setTimeout(()=>{onToggleDone();setSwipeOffset(0);setSwipeAnimating(false)},180)}else{setSwipeOffset(0);setTimeout(()=>setSwipeAnimating(false),200)}},
+trackTouch:true,trackMouse:false,preventScrollOnSwipe:false,delta:12,
+});
+return(<div {…swipeHandlers} style={{position:“relative”,overflow:“hidden”,borderRadius:10,marginBottom:6,opacity:dragging?0.5:1}}>
+{swipeOffset!==0&&<div style={{position:“absolute”,inset:0,borderRadius:10,display:“flex”,alignItems:“center”,justifyContent:swipeOffset>0?“flex-start”:“flex-end”,padding:“0 24px”,background:swipeOffset>0?(swipeReady?”#4ade80”:“rgba(74,222,128,”+(0.2+swipeProgress*0.5)+”)”):(swipeReady?”#ff3b30”:“rgba(255,59,48,”+(0.2+swipeProgress*0.5)+”)”),pointerEvents:“none”,transition:swipeAnimating?“background .18s”:“none”}}>
+<span style={{fontSize:24+swipeProgress*8,color:swipeReady?”#000”:”#fff”,fontWeight:800,transform:“scale(”+(0.6+swipeProgress*0.4)+”)”,transition:“transform .1s”}}>{swipeOffset>0?“✓”:“🗑”}</span>
+
+</div>}
+<div style={{background:T.card,border:"1px solid "+(isEditing?"#ff3b30":T.brd),borderRadius:10,padding:"10px 12px",opacity:habit.doneToday?.4:1,transition:swipeAnimating?"transform .18s cubic-bezier(.2,.8,.4,1)":(swipeOffset!==0?"none":"opacity .2s"),transform:"translate3d("+swipeOffset+"px,0,0)",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none",touchAction:"pan-y",willChange:"transform"}}>
+{isEditing?<div style={{display:"flex",flexDirection:"column",gap:6}}>
+<div style={{display:"flex",gap:6,alignItems:"center"}}>
+<input style={{width:40,padding:"5px 2px",background:T.inp,border:"1px solid "+T.brd,borderRadius:5,color:T.text,fontSize:15,outline:"none",textAlign:"center",flexShrink:0}} placeholder="📌" value={habit.icon} onChange={e=>onUpdate({...habit,icon:e.target.value})} maxLength={2}/>
+<input style={{flex:1,padding:"5px 8px",background:T.inp,border:"1px solid "+T.brd,borderRadius:5,color:T.text,fontSize:13,outline:"none",minWidth:0}} value={habit.title} onChange={e=>onUpdate({...habit,title:e.target.value})}/>
+<button style={{background:"none",border:"1px solid #4ade80",borderRadius:5,color:"#4ade80",fontSize:11,fontWeight:700,cursor:"pointer",padding:"4px 10px"}} onClick={()=>onSetEdit(null)}>完了</button>
+</div>
+<textarea style={{width:"100%",padding:"6px 8px",background:T.inp,border:"1px solid "+T.brd,borderRadius:5,color:T.text,fontSize:11,outline:"none",minHeight:40,resize:"vertical",fontFamily:"inherit"}} placeholder="メモ..." value={habit.memo||""} onChange={e=>onUpdate({...habit,memo:e.target.value})}/>
+</div>:<div style={{display:"flex",alignItems:"center",gap:8}}>
+<button style={{width:20,height:20,borderRadius:5,border:"2px solid "+(habit.doneToday?"#4ade80":T.chk),background:habit.doneToday?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,color:"#000",fontSize:10,fontWeight:700}} onClick={e=>{e.stopPropagation();onToggleDone()}}>{habit.doneToday&&"✓"}</button>
+<div style={{fontSize:18,flexShrink:0,width:24,textAlign:"center",cursor:"pointer"}} onClick={()=>onSetEdit(habit.id)}>{habit.icon||"📌"}</div>
+<div style={{flex:1,cursor:"pointer",minWidth:0}} onClick={()=>onSetEdit(habit.id)}><ScrollTitle text={habit.title} style={{fontSize:13,fontWeight:500,color:T.text,textDecoration:habit.doneToday?"line-through":"none"}}/><div style={{display:"flex",gap:6,alignItems:"center",marginTop:2}}>{habit.streak>=2&&<span style={{fontSize:10,color:"#ff9500",fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>🔥 {habit.streak}</span>}{habit.memo&&<span style={{fontSize:10,color:T.mut,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0,flex:1}}>{habit.memo}</span>}</div></div>
+<div style={{flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",width:28,height:28,color:T.dim,cursor:"grab",touchAction:"none"}} onTouchStart={e=>{e.stopPropagation();onDragStart(e.touches[0].clientY)}} onTouchMove={e=>{if(dragging){e.stopPropagation();onDragMove(e.touches[0].clientY)}}} onTouchEnd={e=>{e.stopPropagation();onDragEnd()}} onClick={e=>e.stopPropagation()}><Grip/></div>
+</div>}
+</div>
+</div>)
+});
+
+const TaskCard=memo(function TaskCard({task,T,isDark,sortOrder,expanded,memoExp,dragging,draggable,isToday,isLatestDone,locEmojis={},displayTier,onToggleExpand,onToggleMemo,onToggleDone,onEdit,onDelete,onUpdateSubtasks,onUpdateMemo,onQuickUpdate,onToggleToday,onFocus,onDragStart,onDragMove,onDragEnd,onSwipeCompleteSound}){
 const isW=task.type===“wish”;
-// Near-deadline wish highlight
 const wishUrgent=isW&&task.deadline&&((new Date(task.deadline)-new Date())/36e5)<24&&((new Date(task.deadline)-new Date())/36e5)>=0;
 const wishOver=isW&&task.deadline&&((new Date(task.deadline)-new Date())/36e5)<0;
 const lb=isW?(wishOver?{t:“OVERDUE”,c:”#ff3b30”}:wishUrgent?{t:“SOON”,c:”#ff9500”}:{t:“WISH”,c:”#c084fc”}):sLabel(task.sc);
 const isOD=task.sc>=1000;
 const rc=isW?(wishOver?”#ff3b30”:wishUrgent?”#ff9500”:”#c084fc”):roi(task.importance,task.weight);
-const pr=isW?5:sortProm(task,sortOrder);
+const pr=isW?5:(displayTier||sortProm(task,sortOrder));
 const wi=WI.find(w=>w.v===task.weight);
 const im=IMP.find(x=>x.v===task.importance);
 const[ns,setNs]=useState(””);
 const[showSubInput,setShowSubInput]=useState(false);
+useEffect(()=>{if(!expanded){setShowSubInput(false);setNs(””)}},[expanded]);
 const[subDragId,setSubDragId]=useState(null);
 const subDragStartY=useRef(0);
 const subs=task.subtasks||[];const sd=subs.filter(s=>s.done).length;const hs=subs.length>0;
@@ -664,18 +1009,95 @@ const addS=()=>{if(!ns.trim())return;onUpdateSubtasks([…subs,{id:Date.now().to
 const subDragStart=(id,y)=>{setSubDragId(id);subDragStartY.current=y};
 const subDragMove=y=>{if(!subDragId)return;const dy=y-subDragStartY.current;const itemH=36;if(Math.abs(dy)<itemH*0.7)return;const steps=Math.trunc(dy/itemH);if(steps===0)return;const idx=subs.findIndex(s=>s.id===subDragId);if(idx<0)return;const newIdx=Math.max(0,Math.min(subs.length-1,idx+steps));if(newIdx===idx)return;const arr=[…subs];const[item]=arr.splice(idx,1);arr.splice(newIdx,0,item);onUpdateSubtasks(arr);subDragStartY.current+=steps*itemH};
 const subDragEnd=()=>setSubDragId(null);
-const tsx=useRef(0),tsy=useRef(0);const[so,setSo]=useState(0);const[sw,setSw]=useState(false);
-const tts=()=>{};
-const ttm=()=>{};
-const tte=()=>{};
-
+const[showQuickMenu,setShowQuickMenu]=useState(false);
+const longPressTimer=useRef(null);
+const SWIPE_THRESHOLD=Math.max(100,Math.min(160,(typeof window!==“undefined”?window.innerWidth:400)*0.3));
+const BOTTOM_GUARD=60;
+const[swipeOffset,setSwipeOffset]=useState(0);
+const[swipeAnimating,setSwipeAnimating]=useState(false);
+const swipeBlockedRef=useRef(false);
+const swipeProgress=Math.min(1,Math.abs(swipeOffset)/SWIPE_THRESHOLD);
+const swipeReady=Math.abs(swipeOffset)>=SWIPE_THRESHOLD;
+const isRecurring=task.recurrence&&task.recurrence!==“none”;
+const swipeHandlers=useSwipeable({
+onSwipeStart:(e)=>{
+if(longPressTimer.current){clearTimeout(longPressTimer.current);longPressTimer.current=null}
+const startY=e.event.touches?e.event.touches[0].clientY:e.event.clientY;
+if(startY>=window.innerHeight-BOTTOM_GUARD){swipeBlockedRef.current=true;return}
+swipeBlockedRef.current=false;
+},
+onSwiping:(e)=>{
+if(swipeBlockedRef.current)return;
+if(expanded||memoExp)return;
+if(e.dir!==“Left”&&e.dir!==“Right”)return;
+if(e.dir===“Right”&&(isRecurring||task.done))return;
+let off=e.deltaX;
+if(e.dir===“Right”&&(isRecurring||task.done))off=0;
+if(Math.abs(off)>SWIPE_THRESHOLD){
+const excess=Math.abs(off)-SWIPE_THRESHOLD;
+off=Math.sign(off)*(SWIPE_THRESHOLD+excess*0.4);
+}
+setSwipeAnimating(false);
+setSwipeOffset(off);
+},
+onSwiped:(e)=>{
+if(swipeBlockedRef.current){swipeBlockedRef.current=false;setSwipeOffset(0);return}
+if(expanded||memoExp){setSwipeOffset(0);return}
+if(e.dir!==“Left”&&e.dir!==“Right”){setSwipeOffset(0);return}
+const off=e.deltaX;
+setSwipeAnimating(true);
+if(off<=-SWIPE_THRESHOLD){
+setSwipeOffset(-600);
+setTimeout(()=>{onDelete();setSwipeOffset(0);setSwipeAnimating(false)},180)
+}else if(off>=SWIPE_THRESHOLD&&!isRecurring&&!task.done){
+if(onSwipeCompleteSound)onSwipeCompleteSound();
+setSwipeOffset(600);
+setTimeout(()=>{onToggleDone(true);setSwipeOffset(0);setSwipeAnimating(false)},180)
+}else{
+setSwipeOffset(0);
+setTimeout(()=>setSwipeAnimating(false),200)
+}
+},
+trackTouch:true,
+trackMouse:false,
+preventScrollOnSwipe:false,
+delta:12,
+});
+const handleTouchStart=()=>{
+if(task.done||expanded||memoExp)return;
+longPressTimer.current=setTimeout(()=>{setShowQuickMenu(true);if(navigator.vibrate)try{navigator.vibrate(30)}catch{}},500)
+};
+const handleTouchMove=()=>{
+if(longPressTimer.current){clearTimeout(longPressTimer.current);longPressTimer.current=null}
+};
+const handleTouchEnd=()=>{
+if(longPressTimer.current){clearTimeout(longPressTimer.current);longPressTimer.current=null}
+};
 const DONE_TIER={bg:isDark?”#0a0a0a”:”#f5f3ec”,border:isDark?“rgba(136,136,136,0.15)”:“rgba(161,161,170,0.3)”,shadow:“none”,fs:13,fw:500,tc:isDark?”#777”:”#52525b”,mc:isDark?”#555”:”#71717a”,pad:10,mfs:9,bfs:8,bp:“2px 6px”};
 const ts=task.done?DONE_TIER:(isDark?TIER[pr]:{…TIER[pr],…TIER_LIGHT[pr]});
 const displayRc=task.done?(isDark?”#555”:”#a1a1aa”):rc;
-const changeIcon=e=>{e.stopPropagation();const current=task.icon||””;const v=prompt(“アイコン（絵文字1-2文字）”,current);if(v===null)return;onQuickUpdate(“icon”,v.slice(0,2))};
-return(<div style={{position:“relative”,overflow:“hidden”,borderRadius:10,opacity:dragging?0.5:1}}>
+const changeIcon=e=>{e.stopPropagation();const current=task.icon||””;const v=prompt(“アイコン(絵文字1-2文字)”,current);if(v===null)return;onQuickUpdate(“icon”,v.slice(0,2))};
 
-<div className="task-card" style={{background:isW?T.card:ts.bg,borderRadius:10,padding:ts.pad+"px 14px "+ts.pad+"px "+(ts.pad+8)+"px",transition:"all .2s",cursor:"pointer",position:"relative",display:"flex",width:"100%",flexDirection:expanded||memoExp?"column":"row",alignItems:expanded||memoExp?"stretch":"center",border:"1px solid "+(isW?(wishOver?"rgba(255,59,48,0.4)":wishUrgent?"rgba(255,149,0,0.4)":"rgba(192,132,252,0.2)"):ts.border),boxShadow:ts.shadow!=="none"?"0 0 10px "+ts.shadow:""}} onClick={e=>{if(e.target.closest(".ne"))return;onToggleExpand()}}>
+return(<div {…swipeHandlers} style={{position:“relative”,overflow:“hidden”,borderRadius:10,opacity:dragging?0.5:1}}>
+{swipeOffset!==0&&<div style={{position:“absolute”,inset:0,borderRadius:10,display:“flex”,alignItems:“center”,justifyContent:swipeOffset>0?“flex-start”:“flex-end”,padding:“0 24px”,background:swipeOffset>0?(swipeReady?”#4ade80”:“rgba(74,222,128,”+(0.2+swipeProgress*0.5)+”)”):(swipeReady?”#ff3b30”:“rgba(255,59,48,”+(0.2+swipeProgress*0.5)+”)”),pointerEvents:“none”,transition:swipeAnimating?“background .18s”:“none”}}>
+<span style={{fontSize:24+swipeProgress*8,color:swipeReady?”#000”:”#fff”,fontWeight:800,transform:“scale(”+(0.6+swipeProgress*0.4)+”)”,transition:“transform .1s”}}>{swipeOffset>0?“✓”:“🗑”}</span>
+
+</div>}
+{showQuickMenu&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.6)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowQuickMenu(false)}>
+<div style={{background:T.card,border:"1px solid "+T.brd,borderRadius:14,padding:14,minWidth:240,maxWidth:320,userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}} onClick={e=>e.stopPropagation()}>
+<div style={{fontSize:12,color:T.mut,marginBottom:10,fontFamily:"'JetBrains Mono',monospace",textAlign:"center"}}>クイック操作</div>
+<div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:12,textAlign:"center",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{task.icon?task.icon+" ":""}{task.title}</div>
+<div style={{display:"flex",flexDirection:"column",gap:6}}>
+{!task.done&&task.type!=="wish"&&onFocus&&<button style={{padding:"13px",borderRadius:8,border:"none",background:"#ff9500",color:"#000",fontSize:14,fontWeight:800,cursor:"pointer",letterSpacing:1}} onClick={()=>{onFocus();setShowQuickMenu(false)}}>▶ これやる(集中モード)</button>}
+{!task.done&&<button style={{padding:"11px",borderRadius:8,border:"1px solid #4ade80",background:"rgba(74,222,128,0.12)",color:"#4ade80",fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={()=>{onToggleDone();setShowQuickMenu(false)}}>✓ 完了にする</button>}
+{!task.done&&task.type!=="wish"&&<button style={{padding:"11px",borderRadius:8,border:"1px solid "+T.brd,background:"transparent",color:T.text,fontSize:13,fontWeight:600,cursor:"pointer"}} onClick={()=>{onToggleToday();setShowQuickMenu(false)}}>{isToday?"◆ TODAYから外す":"◆ TODAYにする"}</button>}
+{!task.done&&<button style={{padding:"11px",borderRadius:8,border:"1px solid "+T.brd,background:"transparent",color:T.text,fontSize:13,fontWeight:600,cursor:"pointer"}} onClick={()=>{onQuickUpdate("type",task.type==="wish"?"task":"wish");setShowQuickMenu(false)}}>⇄ {task.type==="wish"?"タスクに":"やりたいに"}変換</button>}
+<button style={{padding:"11px",borderRadius:8,border:"1px solid rgba(255,59,48,0.3)",background:"transparent",color:"#ff3b30",fontSize:13,fontWeight:600,cursor:"pointer"}} onClick={()=>{onDelete();setShowQuickMenu(false)}}>🗑 削除</button>
+<button style={{padding:"9px",borderRadius:8,border:"none",background:"transparent",color:T.mut,fontSize:12,cursor:"pointer",marginTop:4}} onClick={()=>setShowQuickMenu(false)}>キャンセル</button>
+</div>
+</div>
+</div>}
+<div className="task-card" style={{background:isW?T.card:ts.bg,borderRadius:10,padding:ts.pad+"px 14px "+ts.pad+"px "+(ts.pad+8)+"px",transition:swipeAnimating?"transform .18s cubic-bezier(.2,.8,.4,1)":(swipeOffset!==0?"none":"all .2s"),cursor:"pointer",position:"relative",display:"flex",width:"100%",flexDirection:expanded||memoExp?"column":"row",alignItems:expanded||memoExp?"stretch":"center",border:"1px solid "+(isLatestDone?"rgba(74,222,128,0.5)":isW?(wishOver?"rgba(255,59,48,0.4)":wishUrgent?"rgba(255,149,0,0.4)":"rgba(192,132,252,0.2)"):ts.border),boxShadow:isLatestDone?"0 0 8px rgba(74,222,128,0.2)":ts.shadow!=="none"?"0 0 10px "+ts.shadow:"",transform:"translate3d("+swipeOffset+"px,0,0)",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none",willChange:"transform"}} onClick={e=>{if(e.target.closest(".ne")||Math.abs(swipeOffset)>5)return;onToggleExpand()}} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={handleTouchEnd}>
 {!isW&&!task.done&&<div style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",width:wi?.bw||4,height:(wi?.bh||75)+"%",background:displayRc,borderRadius:"0 3px 3px 0"}}/>}
 {isW&&<div style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",width:3,height:"60%",background:rc,borderRadius:"0 3px 3px 0"}}/>}
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%"}}>
@@ -698,7 +1120,8 @@ return(<div style={{position:“relative”,overflow:“hidden”,borderRadius:1
 </div>}
 {!isW&&task.done&&task.completedAt&&<div style={{fontSize:9,color:ts.mc,marginTop:3,fontFamily:"'JetBrains Mono',monospace"}}>✓ {new Date(task.completedAt).toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</div>}
 {isW&&<div style={{fontSize:10,color:T.mut,marginTop:3,display:"flex",gap:5,fontFamily:"'JetBrains Mono',monospace",flexWrap:"wrap",alignItems:"center"}}>
-{task.deadline&&<><span style={{color:wishOver?"#ff3b30":wishUrgent?"#ff9500":T.mut}}>⏰ {fmtDl(task.deadline)}</span></>}
+{(()=>{const days=Math.floor((Date.now()-task.createdAt)/(24*36e5));return<span style={{color:days>90?"#c084fc":T.mut}}>💭 {days===0?"今日":days+"日前に追加"}</span>})()}
+{task.deadline&&<><span style={{opacity:.3}}>·</span><span style={{color:wishOver?"#ff3b30":wishUrgent?"#ff9500":T.mut}}>⏰ {fmtDl(task.deadline)}</span></>}
 {task.memo&&<><span style={{opacity:.3}}>·</span><span>{task.memo.slice(0,30)}{task.memo.length>30?"...":""}</span></>}
 </div>}
 </div>
@@ -713,10 +1136,9 @@ return(<div style={{position:“relative”,overflow:“hidden”,borderRadius:1
 {draggable&&<div className="ne" style={{display:"flex",alignItems:"center",justifyContent:"center",width:28,height:28,color:T.dim,cursor:"grab",touchAction:"none",marginLeft:2}} onTouchStart={e=>{e.stopPropagation();onDragStart(e.touches[0].clientY)}} onTouchMove={e=>{e.stopPropagation();if(onDragMove)onDragMove(e.touches[0].clientY)}} onTouchEnd={e=>{e.stopPropagation();onDragEnd()}} onClick={e=>e.stopPropagation()}><Grip/></div>}
 </div>
 </div>
-{/* Memo-only expand (B3) */}
 {memoExp&&!expanded&&<div className="ne" style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+T.brd,width:"100%",animation:"slideDown .25s ease"}} onClick={e=>e.stopPropagation()}>
 <div style={{fontSize:9,fontWeight:700,color:T.mut,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontFamily:"'JetBrains Mono',monospace"}}>📝 メモ</div>
-<textarea style={{width:"100%",padding:"8px 10px",background:T.memo,border:"1px solid "+T.memB,borderRadius:6,color:T.sub,fontSize:12,outline:"none",minHeight:60,resize:"vertical",fontFamily:"inherit",lineHeight:1.5}} placeholder="メモを入力..." value={task.memo||""} onChange={e=>onUpdateMemo(e.target.value)} onClick={e=>e.stopPropagation()}/>
+<textarea style={{width:"100%",padding:"10px 12px",background:T.memo,border:"1px solid "+T.memB,borderRadius:8,color:T.text,fontSize:14,outline:"none",minHeight:120,resize:"vertical",fontFamily:"inherit",lineHeight:1.6}} placeholder="メモを入力..." value={task.memo||""} onChange={e=>onUpdateMemo(e.target.value)} onClick={e=>e.stopPropagation()} autoFocus/>
 </div>}
 {expanded&&<div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+T.brd,width:"100%",animation:"slideDown .25s ease"}}>
 {!isW&&<div className="ne" style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
@@ -726,25 +1148,26 @@ return(<div style={{position:“relative”,overflow:“hidden”,borderRadius:1
 </div>}
 {task.deadline&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:T.mut,fontFamily:"'JetBrains Mono',monospace",fontSize:10}}>締切</span><span style={{color:T.text}}>{new Date(task.deadline).toLocaleString()}</span></div>}
 {task.recurrence&&task.recurrence!=="none"&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:T.mut,fontFamily:"'JetBrains Mono',monospace",fontSize:10}}>繰り返し</span><span style={{color:T.text}}>{REC.find(r=>r.v===task.recurrence)?.l}</span></div>}
-{/* Subtasks */}
 <div style={{marginTop:10}}>
 {hs&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{color:T.sub,fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>サブタスク</span><span style={{fontSize:11,color:sd===subs.length?"#4ade80":T.sub,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>{sd}/{subs.length}</span></div>}
-{subs.map(sub=><div key={sub.id} className="ne" style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid "+(isDark?"#1a1a1a":T.brd),opacity:subDragId===sub.id?0.5:1,transition:"opacity .2s"}}><button style={{width:16,height:16,borderRadius:4,border:"2px solid "+(sub.done?"#4ade80":T.chk),background:sub.done?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}} onClick={e=>{e.stopPropagation();onUpdateSubtasks(subs.map(s=>s.id===sub.id?{...s,done:!s.done}:s))}}>{sub.done&&<span style={{fontSize:9,color:"#000",fontWeight:800}}>✓</span>}</button><span style={{fontSize:13,fontWeight:500,color:T.text,flex:1,textDecoration:sub.done?"line-through":"none",opacity:sub.done?.5:1,lineHeight:1.4}}>{sub.title}</span><div style={{display:"flex",alignItems:"center",justifyContent:"center",width:26,height:26,color:T.dim,cursor:"grab",touchAction:"none",flexShrink:0}} onTouchStart={e=>{e.stopPropagation();subDragStart(sub.id,e.touches[0].clientY)}} onTouchMove={e=>{if(subDragId===sub.id){e.stopPropagation();subDragMove(e.touches[0].clientY)}}} onTouchEnd={e=>{e.stopPropagation();subDragEnd()}} onClick={e=>e.stopPropagation()}><Grip/></div><button style={{background:"none",border:"none",color:T.dim,fontSize:12,cursor:"pointer",padding:4}} onClick={e=>{e.stopPropagation();onUpdateSubtasks(subs.filter(s=>s.id!==sub.id))}}>✕</button></div>)}
+{subs.map(sub=><div key={sub.id} className="ne" style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid "+(isDark?"#1a1a1a":T.brd),opacity:subDragId===sub.id?0.5:1,transition:"opacity .2s"}}><button style={{width:16,height:16,borderRadius:4,border:"2px solid "+(sub.done?"#4ade80":T.chk),background:sub.done?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}} onClick={e=>{e.stopPropagation();const wasOff=!sub.done;const updated=subs.map(s=>s.id===sub.id?{...s,done:!s.done}:s);onUpdateSubtasks(updated);if(wasOff&&typeof navigator!=="undefined"&&navigator.vibrate)try{navigator.vibrate(10)}catch{}const allDone=updated.length>0&&updated.every(s=>s.done);if(allDone&&!task.done){setTimeout(()=>{if(confirm("サブタスク全部✓!親タスクも完了にする?"))onToggleDone()},300)}}}>{sub.done&&<span style={{fontSize:9,color:"#000",fontWeight:800}}>✓</span>}</button><span style={{fontSize:13,fontWeight:500,color:T.text,flex:1,textDecoration:sub.done?"line-through":"none",opacity:sub.done?.5:1,lineHeight:1.4}}>{sub.title}</span><div style={{display:"flex",alignItems:"center",justifyContent:"center",width:26,height:26,color:T.dim,cursor:"grab",touchAction:"none",flexShrink:0}} onTouchStart={e=>{e.stopPropagation();subDragStart(sub.id,e.touches[0].clientY)}} onTouchMove={e=>{if(subDragId===sub.id){e.stopPropagation();subDragMove(e.touches[0].clientY)}}} onTouchEnd={e=>{e.stopPropagation();subDragEnd()}} onClick={e=>e.stopPropagation()}><Grip/></div><button style={{background:"none",border:"none",color:T.dim,fontSize:12,cursor:"pointer",padding:4}} onClick={e=>{e.stopPropagation();onUpdateSubtasks(subs.filter(s=>s.id!==sub.id))}}>✕</button></div>)}
 {(showSubInput||hs)?<div className="ne" style={{display:"flex",gap:6,marginTop:6}}><input style={{flex:1,padding:"8px 10px",background:T.memo,border:"1px solid "+T.brd,borderRadius:6,color:T.text,fontSize:13,outline:"none",minWidth:0}} placeholder="サブタスク追加..." value={ns} onChange={e=>setNs(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.stopPropagation();addS()}}} onClick={e=>e.stopPropagation()}/><button style={{width:30,height:30,borderRadius:6,border:"1px solid "+T.brd,background:T.cOff,color:T.sub,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={e=>{e.stopPropagation();addS()}}>+</button></div>
 :<button className="ne" style={{marginTop:4,padding:"5px 10px",borderRadius:6,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:11,fontWeight:600,cursor:"pointer"}} onClick={e=>{e.stopPropagation();setShowSubInput(true)}}>+ サブタスク</button>}
 </div>
-{/* Memo editor (moved below subtasks) */}
 <div className="ne" style={{marginTop:12}} onClick={e=>e.stopPropagation()}>
 <div style={{fontSize:10,fontWeight:700,color:T.sub,textTransform:"uppercase",letterSpacing:1,marginBottom:5,fontFamily:"'JetBrains Mono',monospace"}}>メモ</div>
 <textarea style={{width:"100%",padding:10,background:T.memo,border:"1px solid "+T.memB,borderRadius:6,color:T.text,fontSize:13,lineHeight:1.6,outline:"none",minHeight:50,resize:"vertical",fontFamily:"inherit"}} placeholder="メモ..." value={task.memo||""} onChange={e=>onUpdateMemo(e.target.value)}/>
 </div>
-{/* Edit/Delete buttons moved to bottom right */}
-<div style={{display:"flex",justifyContent:"flex-end",gap:6,marginTop:12}}>
+<div style={{display:"flex",justifyContent:"space-between",gap:6,marginTop:12,alignItems:"center"}}>
+<button className="ne" style={{padding:"5px 10px",borderRadius:6,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:11,fontWeight:600,cursor:"pointer"}} onClick={e=>{e.stopPropagation();onQuickUpdate("type",isW?"task":"wish")}}>{isW?"→ タスクに":"→ やりたいに"}</button>
+<div style={{display:"flex",gap:6}}>
 <button className="ne" style={{padding:"5px 12px",borderRadius:6,border:"1px solid "+T.brd,background:"transparent",color:T.sub,fontSize:11,fontWeight:600,cursor:"pointer"}} onClick={e=>{e.stopPropagation();onEdit()}}>✏️ 編集</button>
 <button className="ne" style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(255,59,48,0.3)",background:"transparent",color:"#ff3b30",fontSize:11,fontWeight:600,cursor:"pointer"}} onClick={e=>{e.stopPropagation();onDelete()}}>🗑</button>
 </div>
+</div>
 </div>}
 </div>
-
-  </div>)
-}
+</div>)
+},(prev,next)=>{
+return prev.task===next.task&&prev.expanded===next.expanded&&prev.memoExp===next.memoExp&&prev.dragging===next.dragging&&prev.draggable===next.draggable&&prev.isToday===next.isToday&&prev.isLatestDone===next.isLatestDone&&prev.sortOrder===next.sortOrder&&prev.isDark===next.isDark&&prev.T===next.T&&prev.locEmojis===next.locEmojis&&prev.displayTier===next.displayTier;
+});
